@@ -23,10 +23,11 @@ Extender los beneficios de FASE 1 (config centralizada + respuestas estandarizad
 | **control-personal-status.php** | ✅ Migrada | 51 → 128 | 9/9 ✅ | State management |
 | **users.php** | ✅ Migrada | 74 → 215 | 10/10 ✅ | CRUD usuarios |
 | **buscar_personal.php** | ✅ Migrada | 102 → 145 | 10/10 ✅ | Multi-tabla search |
+| **guardia-servicio.php** | ✅ Migrada | 271 → 405 | 13/13 ✅ | Guard/Service + access_logs |
 | **vehiculos.php** | ⏳ Próxima | 1,709 | - | CRUD + QR + historial |
-| Resto (8 APIs) | ⏳ Pendiente | ~3,200 | - | APIs menores/medianas |
+| Resto (7 APIs) | ⏳ Pendiente | ~2,900 | - | APIs menores/medianas |
 
-### APIs Completadas (8/21 - 38.1%)
+### APIs Completadas (9/21 - 42.9%)
 
 #### ✅ horas_extra.php
 - **Antes**: 206 líneas (inconsistente)
@@ -104,6 +105,69 @@ Extender los beneficios de FASE 1 (config centralizada + respuestas estandarizad
 - **Funcionalidad**: Autenticación simple (3 usuarios registrados)
 - **Endpoints**: GET para verificar auth, POST para login
 
+#### ✅ control-personal-status.php
+- **Antes**: 51 líneas (state management en sesión)
+- **Después**: 128 líneas (estandarizado + documentado)
+- **Tests**: 9 tests ✅
+- **Cambios clave**:
+  - Config: Usa config/database.php (aunque no accede a BD directamente)
+  - Respuestas: Estandarizadas con ApiResponse
+  - GET: Obtener estado actual (almacenado en $_SESSION)
+  - POST: Actualizar estado con mensaje específico
+  - Estado: Persistido en sesión del usuario (no en BD)
+- **Funcionalidad**: State management de "Control de Unidades" (status + mensajes)
+
+#### ✅ users.php
+- **Antes**: 74 líneas (simple pero inconsistente)
+- **Después**: 215 líneas (estandarizado + modular + seguro)
+- **Tests**: 10 tests ✅
+- **Cambios clave**:
+  - Config: `database/db_acceso.php` → `config/database.php`
+  - Respuestas: Estandarizadas con ApiResponse
+  - GET: Listar todos los usuarios (sin revelar contraseñas)
+  - POST: Crear usuario con password_hash(PASSWORD_DEFAULT)
+  - PUT: Actualizar usuario (con opción de cambiar contraseña)
+  - DELETE: Eliminar usuario por ID
+  - Seguridad: password_hash() + password_verify(), NO retorna contraseñas
+  - Autenticación: Requiere sesión válida para todas las operaciones
+- **Funcionalidad**: CRUD usuarios con gestión segura de contraseñas (3 usuarios activos)
+
+#### ✅ buscar_personal.php
+- **Antes**: 102 líneas (búsqueda básica)
+- **Después**: 145 líneas (estandarizado + modular + multi-tabla)
+- **Tests**: 10 tests ✅
+- **Cambios clave**:
+  - Config: `database/db_personal.php` + `database/db_acceso.php` → `config/database.php`
+  - Respuestas: Estandarizadas con ApiResponse
+  - GET: Búsqueda unificada con 5 tipos (FISCAL, FUNCIONARIO, RESIDENTE, EMPRESA, VISITA)
+  - Validación: Parámetros query y tipo obligatorios
+  - FISCAL/FUNCIONARIO/RESIDENTE: Buscan en tabla personal (personal DB)
+  - RESIDENTE: Filtra adicional es_residente = 1
+  - EMPRESA: Busca en empresa_empleados con JOIN a empresas (acceso DB)
+  - VISITA: Busca en visitas excluyendo lista negra (acceso DB)
+  - Límite: LIMIT 10 resultados por búsqueda
+- **Funcionalidad**: Búsqueda multi-tabla + multi-BD unificada
+- **Conexiones**: Usa ambas BD (personal + acceso) según tipo de búsqueda
+
+#### ✅ guardia-servicio.php
+- **Antes**: 271 líneas (acciones por query params)
+- **Después**: 405 líneas (estandarizado + modular + paginado)
+- **Tests**: 13 tests ✅
+- **Cambios clave**:
+  - Config: `database/db_acceso.php` → `config/database.php`
+  - Respuestas: Estandarizadas con ApiResponse
+  - GET: Listar registros ACTIVOS con LEFT JOIN a personal para obtener Grado
+  - GET ?action=verify&rut=XXX: Verificar si RUT tiene registro activo
+  - GET ?action=history: Historial completo con paginación (page, perPage)
+  - POST: Crear nuevo registro de guardia/servicio con validaciones
+  - POST ?action=finish: Finalizar/cerrar registro (cambiar status a FINALIZADO)
+  - Validación: Tipos GUARDIA o SERVICIO, detecta registros activos duplicados
+  - Status: ACTIVO o FINALIZADO
+  - Integración: Registra entrada/salida automáticamente en access_logs
+  - Paginación: Historia soporta LIMIT/OFFSET
+- **Funcionalidad**: Gestión de guardias y servicios con logging de acceso (13 registros activos)
+- **Conexiones**: Usa ambas BD (acceso + personal) para datos enriched
+
 ---
 
 ## 🎯 Patrón Establecido para Migraciones
@@ -168,19 +232,19 @@ function handleDelete($conn) {
 
 ### Migraciones Completadas
 ```
-APIs migradas: 8/21 (38.1%)
-Tests implementados: 8 suites (76 tests)
-Tests pasados: 76/76 (100%)
-Líneas de código nuevo: ~5,200
+APIs migradas: 9/21 (42.9%)
+Tests implementados: 9 suites (89 tests)
+Tests pasados: 89/89 (100%)
+Líneas de código nuevo: ~5,850
 ```
 
 ### Beneficios Entregados
-- ✅ Config centralizada en 8 APIs (credenciales protegidas)
-- ✅ Respuestas estandarizadas en 8 APIs
-- ✅ Paginación implementada en 4 APIs
-- ✅ Testing validando calidad de migraciones (76 tests, 100% pasados)
-- ✅ Patrón establecido para replicar en 13 APIs restantes
-- ✅ 8 patrones de API validados y documentados:
+- ✅ Config centralizada en 9 APIs (credenciales protegidas)
+- ✅ Respuestas estandarizadas en 9 APIs
+- ✅ Paginación implementada en 5 APIs (horas_extra, personal, empresas, visitas, guardia-servicio)
+- ✅ Testing validando calidad de migraciones (89 tests, 100% pasados)
+- ✅ Patrón establecido para replicar en 12 APIs restantes
+- ✅ 10 patrones de API validados y documentados:
   - Simple CRUD (users, empresas)
   - Búsqueda multi-tabla (buscar_personal)
   - Status dinámico (visitas)
@@ -189,6 +253,8 @@ Líneas de código nuevo: ~5,200
   - Bulk import (personal)
   - Toggle actions (visitas)
   - POC/Familiar enrichment (empresas, visitas)
+  - Guard/Service management + access logging (guardia-servicio)
+  - Action-based routing con paginación (guardia-servicio)
 
 ---
 
@@ -356,7 +422,7 @@ f0c5946 - Refactor: Migrate personal.php API (10 tests ✅)
 
 ---
 
-**Estado Actual**: 📍 8 APIs migradas de 21 (38.1%)
-**Progreso FASE 2**: 📊 Más de 1/3 del proyecto migrado - Patrones consolidados
-**Próxima Acción**: Continuar con APIs medianas (guardia-servicio, log_clarified_access)
+**Estado Actual**: 📍 9 APIs migradas de 21 (42.9%)
+**Progreso FASE 2**: 📊 Casi 43% del proyecto migrado - Patrones consolidados
+**Próxima Acción**: Continuar con APIs medianas (log_clarified_access, empresa_empleados, comision)
 
