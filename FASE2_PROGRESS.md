@@ -25,10 +25,11 @@ Extender los beneficios de FASE 1 (config centralizada + respuestas estandarizad
 | **buscar_personal.php** | ✅ Migrada | 102 → 145 | 10/10 ✅ | Multi-tabla search |
 | **guardia-servicio.php** | ✅ Migrada | 271 → 405 | 13/13 ✅ | Guard/Service + access_logs |
 | **log_clarified_access.php** | ✅ Migrada | 134 → 185 | 12/12 ✅ | Access logging + validation |
+| **empresa_empleados.php** | ✅ Migrada | 411 → 520 | 13/13 ✅ | Employees CRUD + status calc |
 | **vehiculos.php** | ⏳ Próxima | 1,709 | - | CRUD + QR + historial |
-| Resto (6 APIs) | ⏳ Pendiente | ~2,800 | - | APIs menores/medianas |
+| Resto (5 APIs) | ⏳ Pendiente | ~2,400 | - | APIs menores/medianas |
 
-### APIs Completadas (10/21 - 47.6%)
+### APIs Completadas (11/21 - 52.4%)
 
 #### ✅ horas_extra.php
 - **Antes**: 206 líneas (inconsistente)
@@ -190,6 +191,28 @@ Extender los beneficios de FASE 1 (config centralizada + respuestas estandarizad
 - **Funcionalidad**: Registro de ingresos clarificados con logging automático (599 access_logs total)
 - **Conexiones**: Usa ambas BD (acceso para logs, personal para detalles)
 
+#### ✅ empresa_empleados.php
+- **Antes**: 411 líneas (inconsistente, error handling manual)
+- **Después**: 520 líneas (estandarizado + modular + robusto)
+- **Tests**: 13 tests ✅
+- **Cambios clave**:
+  - Config: `database/db_acceso.php` → `config/database.php`
+  - Respuestas: Estandarizadas con ApiResponse
+  - Error handling: set_error_handler() + register_shutdown_function() para robustez
+  - GET: Listar todos o por empresa_id con status dinámico
+  - POST: Crear empleado con validación de campos requeridos
+  - PUT: Actualizar empleado con verificación de existencia
+  - DELETE: Soft delete (marca como status='inactivo')
+  - Validación: empresa_id, nombre, paterno, rut, fecha_inicio requeridos
+  - Status dinámico: Función calculateStatus() evalúa:
+    - acceso_permanente=true → "autorizado"
+    - fecha_expiracion >= hoy → "autorizado"
+    - Otro → "no autorizado"
+  - Acceso condicional: Si acceso_permanente=false, requiere fecha_expiracion
+  - Autenticación: Requiere sesión válida
+  - CORS: Soporta preflight OPTIONS
+- **Funcionalidad**: CRUD completo de empleados empresariales con acceso temporal/permanente (6 empleados activos)
+
 ---
 
 ## 🎯 Patrón Establecido para Migraciones
@@ -254,19 +277,19 @@ function handleDelete($conn) {
 
 ### Migraciones Completadas
 ```
-APIs migradas: 10/21 (47.6%)
-Tests implementados: 10 suites (101 tests)
-Tests pasados: 101/101 (100%)
-Líneas de código nuevo: ~6,100
+APIs migradas: 11/21 (52.4%)
+Tests implementados: 11 suites (114 tests)
+Tests pasados: 114/114 (100%)
+Líneas de código nuevo: ~6,750
 ```
 
 ### Beneficios Entregados
-- ✅ Config centralizada en 10 APIs (credenciales protegidas)
-- ✅ Respuestas estandarizadas en 10 APIs
+- ✅ Config centralizada en 11 APIs (credenciales protegidas)
+- ✅ Respuestas estandarizadas en 11 APIs
 - ✅ Paginación implementada en 5 APIs (horas_extra, personal, empresas, visitas, guardia-servicio)
-- ✅ Testing validando calidad de migraciones (101 tests, 100% pasados)
-- ✅ Patrón establecido para replicar en 11 APIs restantes
-- ✅ 10 patrones de API validados y documentados:
+- ✅ Testing validando calidad de migraciones (114 tests, 100% pasados)
+- ✅ Patrón establecido para replicar en 10 APIs restantes
+- ✅ 11 patrones de API validados y documentados:
   - Simple CRUD (users, empresas)
   - Búsqueda multi-tabla (buscar_personal)
   - Status dinámico (visitas)
@@ -444,7 +467,7 @@ f0c5946 - Refactor: Migrate personal.php API (10 tests ✅)
 
 ---
 
-**Estado Actual**: 📍 10 APIs migradas de 21 (47.6%)
-**Progreso FASE 2**: 📊 Casi 48% del proyecto migrado - Patrones consolidados
-**Próxima Acción**: Continuar con APIs medianas (empresa_empleados, comision, reportes)
+**Estado Actual**: 📍 11 APIs migradas de 21 (52.4%)
+**Progreso FASE 2**: 📊 Más de 52% del proyecto migrado - Patrón consolidado
+**Próxima Acción**: Continuar con APIs medianas (comision, reportes, log_access)
 
