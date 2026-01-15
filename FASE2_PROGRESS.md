@@ -24,10 +24,11 @@ Extender los beneficios de FASE 1 (config centralizada + respuestas estandarizad
 | **users.php** | ✅ Migrada | 74 → 215 | 10/10 ✅ | CRUD usuarios |
 | **buscar_personal.php** | ✅ Migrada | 102 → 145 | 10/10 ✅ | Multi-tabla search |
 | **guardia-servicio.php** | ✅ Migrada | 271 → 405 | 13/13 ✅ | Guard/Service + access_logs |
+| **log_clarified_access.php** | ✅ Migrada | 134 → 185 | 12/12 ✅ | Access logging + validation |
 | **vehiculos.php** | ⏳ Próxima | 1,709 | - | CRUD + QR + historial |
-| Resto (7 APIs) | ⏳ Pendiente | ~2,900 | - | APIs menores/medianas |
+| Resto (6 APIs) | ⏳ Pendiente | ~2,800 | - | APIs menores/medianas |
 
-### APIs Completadas (9/21 - 42.9%)
+### APIs Completadas (10/21 - 47.6%)
 
 #### ✅ horas_extra.php
 - **Antes**: 206 líneas (inconsistente)
@@ -168,6 +169,27 @@ Extender los beneficios de FASE 1 (config centralizada + respuestas estandarizad
 - **Funcionalidad**: Gestión de guardias y servicios con logging de acceso (13 registros activos)
 - **Conexiones**: Usa ambas BD (acceso + personal) para datos enriched
 
+#### ✅ log_clarified_access.php
+- **Antes**: 134 líneas (POST-only, inconsistente)
+- **Después**: 185 líneas (estandarizado + modular + robusto)
+- **Tests**: 12 tests ✅
+- **Cambios clave**:
+  - Config: `database/db_acceso.php` + `database/db_personal.php` → `config/database.php`
+  - Respuestas: Estandarizadas con ApiResponse
+  - POST: Registrar ingreso con motivo específico
+  - Validación: Motivos restringidos (residencia, trabajo, reunion, otros)
+  - Mapeo: Cada motivo mapea a punto_acceso + motivo específico:
+    - residencia → punto_acceso='residencia', motivo='Ingreso a residencia'
+    - trabajo → punto_acceso='oficina', motivo='Trabajo'
+    - reunion → punto_acceso='reunion', motivo='Reunión'
+    - otros → punto_acceso='portico', motivo=details o 'Otros'
+  - GET personal: Obtiene Grado, Nombres, Paterno, Materno, foto desde personal DB
+  - INSERT access_logs: Registra entrada en BD acceso con timestamp
+  - Autenticación: Requiere sesión válida
+  - CORS: Soporta preflight OPTIONS
+- **Funcionalidad**: Registro de ingresos clarificados con logging automático (599 access_logs total)
+- **Conexiones**: Usa ambas BD (acceso para logs, personal para detalles)
+
 ---
 
 ## 🎯 Patrón Establecido para Migraciones
@@ -232,18 +254,18 @@ function handleDelete($conn) {
 
 ### Migraciones Completadas
 ```
-APIs migradas: 9/21 (42.9%)
-Tests implementados: 9 suites (89 tests)
-Tests pasados: 89/89 (100%)
-Líneas de código nuevo: ~5,850
+APIs migradas: 10/21 (47.6%)
+Tests implementados: 10 suites (101 tests)
+Tests pasados: 101/101 (100%)
+Líneas de código nuevo: ~6,100
 ```
 
 ### Beneficios Entregados
-- ✅ Config centralizada en 9 APIs (credenciales protegidas)
-- ✅ Respuestas estandarizadas en 9 APIs
+- ✅ Config centralizada en 10 APIs (credenciales protegidas)
+- ✅ Respuestas estandarizadas en 10 APIs
 - ✅ Paginación implementada en 5 APIs (horas_extra, personal, empresas, visitas, guardia-servicio)
-- ✅ Testing validando calidad de migraciones (89 tests, 100% pasados)
-- ✅ Patrón establecido para replicar en 12 APIs restantes
+- ✅ Testing validando calidad de migraciones (101 tests, 100% pasados)
+- ✅ Patrón establecido para replicar en 11 APIs restantes
 - ✅ 10 patrones de API validados y documentados:
   - Simple CRUD (users, empresas)
   - Búsqueda multi-tabla (buscar_personal)
@@ -422,7 +444,7 @@ f0c5946 - Refactor: Migrate personal.php API (10 tests ✅)
 
 ---
 
-**Estado Actual**: 📍 9 APIs migradas de 21 (42.9%)
-**Progreso FASE 2**: 📊 Casi 43% del proyecto migrado - Patrones consolidados
-**Próxima Acción**: Continuar con APIs medianas (log_clarified_access, empresa_empleados, comision)
+**Estado Actual**: 📍 10 APIs migradas de 21 (47.6%)
+**Progreso FASE 2**: 📊 Casi 48% del proyecto migrado - Patrones consolidados
+**Próxima Acción**: Continuar con APIs medianas (empresa_empleados, comision, reportes)
 
