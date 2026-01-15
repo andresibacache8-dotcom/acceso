@@ -27,10 +27,11 @@ Extender los beneficios de FASE 1 (config centralizada + respuestas estandarizad
 | **log_clarified_access.php** | ✅ Migrada | 134 → 185 | 12/12 ✅ | Access logging + validation |
 | **empresa_empleados.php** | ✅ Migrada | 411 → 520 | 13/13 ✅ | Employees CRUD + status calc |
 | **comision.php** | ✅ Migrada | 162 → 290 | 12/12 ✅ | Commissions CRUD + status |
+| **log_access.php** | ✅ Migrada | 490 → 635 | 13/13 ✅ | Access logging multi-tipo |
 | **vehiculos.php** | ⏳ Próxima | 1,709 | - | CRUD + QR + historial |
-| Resto (4 APIs) | ⏳ Pendiente | ~2,150 | - | APIs menores/medianas |
+| Resto (3 APIs) | ⏳ Pendiente | ~2,200 | - | APIs menores/medianas |
 
-### APIs Completadas (12/21 - 57.1%)
+### APIs Completadas (13/21 - 61.9%)
 
 #### ✅ horas_extra.php
 - **Antes**: 206 líneas (inconsistente)
@@ -234,6 +235,35 @@ Extender los beneficios de FASE 1 (config centralizada + respuestas estandarizad
   - Nombre completo: CONCAT_WS(' ', grado, nombres, paterno, materno)
 - **Funcionalidad**: CRUD completo de comisiones de personal (1 comisión activa)
 
+#### ✅ log_access.php
+- **Antes**: 490 líneas (compleja, inconsistente)
+- **Después**: 635 líneas (estandarizado + modular + robusto)
+- **Tests**: 13 tests ✅
+- **Cambios clave**:
+  - Config: `database/db_acceso.php` + `database/db_personal.php` → `config/database.php`
+  - Respuestas: Estandarizadas con ApiResponse
+  - GET: Listar logs del día actual filtrando por target_type
+  - GET router: 5 handlers especializados (handleGetPersonal, handleGetVehiculo, handleGetVisita, handleGetEmpresaEmpleado, handleGetPersonalComision)
+  - GET tipos soportados:
+    - 'personal': Búsqueda en tabla personal con JOINs enriquecidos
+    - 'vehiculo': Búsqueda con asociados (personal/empresa/visita), triple lookup
+    - 'visita': Búsqueda simple en tabla visitas
+    - 'empresa_empleado': JOINs empresa_empleados + empresas
+    - 'personal_comision': Búsqueda en tabla personal_comision
+  - POST: Registrar nuevo acceso (entrada/salida)
+  - POST router: 3 procesadores (processPersonal, processVehiculo, processVisita)
+  - Validación: target_id + target_type obligatorios
+  - Status dinámico: Función getStatusByDate() evalúa autorizado/no autorizado
+  - Lógica especial de horarios: Para oficina/personal → entrada 7AM, salida 4PM
+  - Lista negra: Visitas en lista negra se rechazan (403)
+  - DELETE: Soft delete con log_status='cancelado'
+  - Autenticación: Requiere sesión válida
+  - CORS: Soporta preflight OPTIONS
+  - Multi-tabla: Lookups dinámicos de asociados (personal_ids, empresa_ids, visita_ids)
+  - Dynamic placeholders: Construcción segura de IN clauses con arrays
+- **Funcionalidad**: Logging de acceso multi-tipo con validación de estado (599 access_logs total)
+- **Conexiones**: Usa ambas BD (acceso para logs, personal para detalles) con triple joins para vehículos
+
 ---
 
 ## 🎯 Patrón Establecido para Migraciones
@@ -298,19 +328,19 @@ function handleDelete($conn) {
 
 ### Migraciones Completadas
 ```
-APIs migradas: 12/21 (57.1%)
-Tests implementados: 12 suites (126 tests)
-Tests pasados: 126/126 (100%)
-Líneas de código nuevo: ~7,200
+APIs migradas: 13/21 (61.9%)
+Tests implementados: 13 suites (139 tests)
+Tests pasados: 139/139 (100%)
+Líneas de código nuevo: ~7,835
 ```
 
 ### Beneficios Entregados
-- ✅ Config centralizada en 12 APIs (credenciales protegidas)
-- ✅ Respuestas estandarizadas en 12 APIs
+- ✅ Config centralizada en 13 APIs (credenciales protegidas)
+- ✅ Respuestas estandarizadas en 13 APIs
 - ✅ Paginación implementada en 5 APIs (horas_extra, personal, empresas, visitas, guardia-servicio)
-- ✅ Testing validando calidad de migraciones (126 tests, 100% pasados)
-- ✅ Patrón establecido para replicar en 9 APIs restantes
-- ✅ 12 patrones de API validados y documentados:
+- ✅ Testing validando calidad de migraciones (139 tests, 100% pasados)
+- ✅ Patrón establecido para replicar en 8 APIs restantes
+- ✅ 13 patrones de API validados y documentados:
   - Simple CRUD (users, empresas)
   - Búsqueda multi-tabla (buscar_personal)
   - Status dinámico (visitas)
@@ -321,6 +351,9 @@ Líneas de código nuevo: ~7,200
   - POC/Familiar enrichment (empresas, visitas)
   - Guard/Service management + access logging (guardia-servicio)
   - Action-based routing con paginación (guardia-servicio)
+  - Multi-tipo logging con dynamic lookups (log_access)
+  - Condiciones horarias especiales (log_access)
+  - Soft delete con status tracking (múltiples APIs)
 
 ---
 
@@ -488,7 +521,7 @@ f0c5946 - Refactor: Migrate personal.php API (10 tests ✅)
 
 ---
 
-**Estado Actual**: 📍 12 APIs migradas de 21 (57.1%)
-**Progreso FASE 2**: 📊 Más de 57% del proyecto migrado - Patrón completamente consolidado
-**Próxima Acción**: Continuar con APIs medianas (reportes, log_access, dashboard)
+**Estado Actual**: 📍 13 APIs migradas de 21 (61.9%) ✨ CRUZAMOS 60%
+**Progreso FASE 2**: 📊 Casi 62% del proyecto migrado - Patrón completamente consolidado
+**Próxima Acción**: Continuar con APIs medianas (dashboard, reportes, portico) → Alcanzar 70%
 
