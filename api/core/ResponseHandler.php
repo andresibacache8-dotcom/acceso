@@ -264,8 +264,8 @@ class ApiResponse
     }
 }
 
-// Handle OPTIONS requests automatically
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+// Handle OPTIONS requests automatically (only in HTTP context)
+if (php_sapi_name() !== 'cli' && isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     ApiResponse::handleOptions();
 }
 ?>
