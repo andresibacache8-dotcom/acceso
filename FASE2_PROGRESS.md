@@ -17,13 +17,13 @@ Extender los beneficios de FASE 1 (config centralizada + respuestas estandarizad
 |-----|--------|--------|-------|------|
 | **horas_extra.php** | ✅ Migrada | 206 → 260 | 7/7 ✅ | Piloto exitoso |
 | **personal.php** | ✅ Migrada | 450 → 833 | 10/10 ✅ | Importación masiva mantenida |
-| **empresas.php** | ⏳ Siguiente | 1,041 | - | CRUD completo |
+| **empresas.php** | ✅ Migrada | 155 → 480 | 12/12 ✅ | POC enrichment + paginación |
 | **vehiculos.php** | ⏳ Pendiente | 1,709 | - | CRUD + QR + historial |
 | **visitas.php** | ⏳ Pendiente | 562 | - | CRUD + lista negra |
 | **control.php** | ⏳ Pendiente | 1,679 | - | Escaneo pórtico |
 | Resto (12 APIs) | ⏳ Pendiente | ~3,500 | - | APIs menores |
 
-### APIs Completadas (2/21)
+### APIs Completadas (3/21 - 14.3%)
 
 #### ✅ horas_extra.php
 - **Antes**: 206 líneas (inconsistente)
@@ -48,6 +48,22 @@ Extender los beneficios de FASE 1 (config centralizada + respuestas estandarizad
   - PUT: Update dinámico de todos los campos
   - DELETE: Hard delete
 - **Mantenido**: Toda funcionalidad original (1,228 registros activos)
+
+#### ✅ empresas.php
+- **Antes**: 155 líneas (inconsistente, sin paginación)
+- **Después**: 480 líneas (estandarizado + modular + paginado)
+- **Tests**: 12 tests ✅
+- **Cambios clave**:
+  - Config: `database/db_acceso.php` → `config/database.php`
+  - Respuestas: Estandarizadas con ApiResponse
+  - GET: Búsqueda por nombre + paginación (page, perPage)
+  - GET ?id=: Obtener empresa específica
+  - POST: Crear empresa con normalización de texto
+  - PUT: Update dinámico de campos
+  - DELETE: Eliminación con verificación de existencia
+  - POC Enrichment: Función enrichEmpresaWithPOC() obtiene datos de personal si existen
+- **Funcionalidad**: CRUD completo mantenido (2 registros activos)
+- **Conexiones**: Usa ambas BD (acceso + personal) para enriquecimiento
 
 ---
 
@@ -113,18 +129,19 @@ function handleDelete($conn) {
 
 ### Migraciones Completadas
 ```
-APIs migradas: 2/21 (9.5%)
-Tests implementados: 2 suites (17 tests)
-Tests pasados: 17/17 (100%)
-Líneas de código nuevo: ~1,100
+APIs migradas: 3/21 (14.3%)
+Tests implementados: 3 suites (29 tests)
+Tests pasados: 29/29 (100%)
+Líneas de código nuevo: ~1,573
 ```
 
 ### Beneficios Entregados
-- ✅ Config centralizada en 2 APIs (credenciales protegidas)
-- ✅ Respuestas estandarizadas en 2 APIs
-- ✅ Paginación implementada en 2 APIs
-- ✅ Testing validando calidad de migraciones
-- ✅ Patrón establecido para replicar en 19 APIs restantes
+- ✅ Config centralizada en 3 APIs (credenciales protegidas)
+- ✅ Respuestas estandarizadas en 3 APIs
+- ✅ Paginación implementada en 3 APIs
+- ✅ Testing validando calidad de migraciones (29 tests, 100% pasados)
+- ✅ Patrón establecido para replicar en 18 APIs restantes
+- ✅ POC enrichment pattern validado (interconexión entre BDs)
 
 ---
 
@@ -227,6 +244,7 @@ Líneas de código nuevo: ~1,100
 ## 📝 Commits FASE 2
 
 ```
+3b5ec19 - Refactor: Migrate empresas.php API (12 tests ✅)
 f0c5946 - Refactor: Migrate personal.php API (10 tests ✅)
 556116e - Test: Add horas_extra.php migration test (7 tests ✅)
 523e596 - Refactor: Migrate horas_extra.php API
@@ -237,19 +255,19 @@ f0c5946 - Refactor: Migrate personal.php API (10 tests ✅)
 ## 📊 Beneficios Logrados Hasta Ahora
 
 ### Seguridad
-- ✅ Credenciales de 2 APIs (horas_extra, personal) ahora centralizadas
+- ✅ Credenciales de 3 APIs (horas_extra, personal, empresas) ahora centralizadas
 - ✅ No hay secretos en código migrado
-- ✅ 19 APIs restantes aún con credenciales hardcodeadas ⚠️
+- ✅ 18 APIs restantes aún con credenciales hardcodeadas ⚠️
 
 ### Escalabilidad
-- ✅ Paginación en 2 APIs críticas
-- ✅ 19 APIs restantes sin paginación ⚠️
-- ✅ Patrón establecido para todas
+- ✅ Paginación en 3 APIs (incluyendo CRUD simple + búsqueda)
+- ✅ 18 APIs restantes sin paginación ⚠️
+- ✅ Patrón consolidado y validado
 
 ### Mantenibilidad
-- ✅ Respuestas estandarizadas en 2 APIs
-- ✅ 19 APIs con formatos inconsistentes ⚠️
-- ✅ Testing validando calidad
+- ✅ Respuestas estandarizadas en 3 APIs
+- ✅ 18 APIs con formatos inconsistentes ⚠️
+- ✅ Testing validando calidad (29 tests, 100% pasados)
 
 ### Performance
 - ✅ personal.php con 1,228 registros: paginación activa
@@ -285,7 +303,7 @@ f0c5946 - Refactor: Migrate personal.php API (10 tests ✅)
 
 ---
 
-**Estado Actual**: 📍 2 APIs migradas de 21 (9.5%)
-**Progreso FASE 2**: 📊 En buen camino
-**Próxima Acción**: Migrar empresas.php (ETAPA 2.1.5)
+**Estado Actual**: 📍 3 APIs migradas de 21 (14.3%)
+**Progreso FASE 2**: 📊 Consolidado - Patrón validado
+**Próxima Acción**: Migrar vehiculos.php (ETAPA 2.1.6)
 
