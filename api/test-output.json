@@ -1,0 +1,133 @@
+{
+    "access_logs_activos": {
+        "total": "526"
+    },
+    "ultimos_access_logs": [
+        {
+            "id": "566",
+            "Nombres": "DANIEL",
+            "target_id": "5",
+            "action": "entrada",
+            "log_status": "activo",
+            "log_time": "2025-10-27 23:10:47"
+        },
+        {
+            "id": "565",
+            "Nombres": "DANIEL",
+            "target_id": "5",
+            "action": "salida",
+            "log_status": "activo",
+            "log_time": "2025-10-27 23:10:10"
+        },
+        {
+            "id": "564",
+            "Nombres": "DANIEL",
+            "target_id": "5",
+            "action": "entrada",
+            "log_status": "activo",
+            "log_time": "2025-10-27 23:07:38"
+        },
+        {
+            "id": "563",
+            "Nombres": "DANIEL",
+            "target_id": "5",
+            "action": "salida",
+            "log_status": "activo",
+            "log_time": "2025-10-27 23:07:32"
+        },
+        {
+            "id": "562",
+            "Nombres": "DANIEL",
+            "target_id": "5",
+            "action": "entrada",
+            "log_status": "activo",
+            "log_time": "2025-10-27 22:11:39"
+        },
+        {
+            "id": "561",
+            "Nombres": "DANIEL",
+            "target_id": "5",
+            "action": "salida",
+            "log_status": "activo",
+            "log_time": "2025-10-27 21:17:39"
+        },
+        {
+            "id": "560",
+            "Nombres": "NICOLE",
+            "target_id": "6",
+            "action": "salida",
+            "log_status": "activo",
+            "log_time": "2025-10-27 19:30:19"
+        },
+        {
+            "id": "559",
+            "Nombres": "NICOLE",
+            "target_id": "6",
+            "action": "entrada",
+            "log_status": "activo",
+            "log_time": "2025-10-27 19:29:53"
+        },
+        {
+            "id": "553",
+            "Nombres": "DANIEL",
+            "target_id": "5",
+            "action": "entrada",
+            "log_status": "activo",
+            "log_time": "2025-10-27 13:54:12"
+        },
+        {
+            "id": "552",
+            "Nombres": "DANIEL",
+            "target_id": "5",
+            "action": "salida",
+            "log_status": "activo",
+            "log_time": "2025-10-27 13:53:53"
+        }
+    ],
+    "horas_extra_activas": [
+        {
+            "id": "30",
+            "personal_rut": "17964768",
+            "fecha_hora_termino": "2025-10-28 23:01:00",
+            "status": "activo",
+            "Nombres": "DANIEL",
+            "NrRut": "17964768"
+        }
+    ],
+    "test_alerta_atrasado": [
+        {
+            "id": "5",
+            "Nombres": "DANIEL",
+            "NrRut": "17964768",
+            "fecha_hora_termino": "2025-10-28 23:01:00",
+            "hora_actual": "23:29:01",
+            "hora_termino": "23:01:00"
+        }
+    ],
+    "test_alerta_no_autorizado": [
+        {
+            "id": "4",
+            "Nombres": "LUIS",
+            "NrRut": "21142815",
+            "he_id": null
+        },
+        {
+            "id": "7",
+            "Nombres": "BRYAN",
+            "NrRut": "19424209",
+            "he_id": null
+        }
+    ],
+    "daniel_y_bryan": [
+        {
+            "id": "5",
+            "Nombres": "DANIEL",
+            "NrRut": "17964768"
+        },
+        {
+            "id": "7",
+            "Nombres": "BRYAN",
+            "NrRut": "19424209"
+        }
+    ]
+}

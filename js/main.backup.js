@@ -1,0 +1,4038 @@
+// Guardián de la página: redirige a login si no se ha iniciado sesión.
+if (sessionStorage.getItem('isLoggedIn') !== 'true') {
+    window.location.href = 'login.html';
+}
+
+// ============================================================================
+// IMPORTS DE MÓDULOS
+// ============================================================================
+import { validarRUT, formatearRUT } from './utils/validators.js';
+
+// main.js
+document.addEventListener('DOMContentLoaded', () => {
+    // --- ESTADO DE LA APLICACIÓN ---
+    let personalData = [], vehiculosData = [], visitasData = [], horasExtraData = [], usersData = [];
+
+    // --- SELECTORES DEL DOM ---
+    const logoutButton = document.getElementById('logout-button');
+    const navLinks = document.querySelectorAll('.nav-link');
+    const mainContent = document.querySelector('main');
+    const toastEl = document.getElementById('toast');
+    const bsToast = new bootstrap.Toast(toastEl);
+
+    // --- FUNCIONES DE TOAST (NOTIFICACIONES) ---
+    function showToast(message, type = 'info', title = 'Notificación') {
+        const toastHeader = toastEl.querySelector('.toast-header');
+        const toastBody = toastEl.querySelector('.toast-body');
+        const toastTitle = toastEl.querySelector('.me-auto');
+        const toastIcon = toastEl.querySelector('.toast-icon');
+
+        // Limpiar clases de tipo anteriores
+        toastIcon.className = 'toast-icon'; // Resetear clases
+        toastHeader.className = 'toast-header'; // Resetear clases
+
+        // Establecer clases y contenido según el tipo
+        switch (type) {
+            case 'success':
+                toastIcon.classList.add('text-success');
+                toastIcon.innerHTML = '<i class="bi bi-check-circle-fill"></i>';
+                toastHeader.classList.add('text-bg-success');
+                break;
+            case 'error':
+                toastIcon.classList.add('text-danger');
+                toastIcon.innerHTML = '<i class="bi bi-x-circle-fill"></i>';
+                toastHeader.classList.add('text-bg-danger');
+                break;
+            case 'warning':
+                toastIcon.classList.add('text-warning');
+                toastIcon.innerHTML = '<i class="bi bi-exclamation-triangle-fill"></i>';
+                toastHeader.classList.add('text-bg-warning');
+                break;
+            case 'info':
+            default:
+                toastIcon.classList.add('text-info');
+                toastIcon.innerHTML = '<i class="bi bi-info-circle-fill"></i>';
+                toastHeader.classList.add('text-bg-info');
+                break;
+        }
+
+        toastTitle.textContent = title;
+        toastBody.textContent = message;
+        bsToast.show();
+    }
+    window.showToast = showToast; // Hacerla global
+    const loadingSpinner = document.getElementById('loading-spinner');
+
+    // --- FUNCIONES DE CARGA (SPINNER) ---
+    function showLoadingSpinner() {
+        if (loadingSpinner) loadingSpinner.classList.remove('d-none');
+    }
+
+    function hideLoadingSpinner() {
+        if (loadingSpinner) loadingSpinner.classList.add('d-none');
+    }
+
+    // Pasar las funciones de carga a la API
+    api.setLoadingFunctions(showLoadingSpinner, hideLoadingSpinner);
+
+    // --- INICIALIZACIÓN ---
+    function init() {
+        document.getElementById('app').classList.remove('d-none');
+        if (logoutButton) { logoutButton.addEventListener('click', handleLogout); }
+        if (navLinks) { navLinks.forEach(link => link.addEventListener('click', handleNavigation)); }
+        navigateTo('inicio');
+        // applyRoleBasedAccess(); // TODO: Implementar RBAC
+    }
+    
+    // --- LÓGICA DE NAVEGACIÓN ---
+    function handleLogout() {
+        sessionStorage.clear();
+        window.location.href = 'login.html';
+    }
+
+    function handleNavigation(e) {
+        const link = e.currentTarget;
+        // Si el enlace es un toggle para un submenú, no hagas nada.
+        // Bootstrap se encargará de abrir/cerrar el submenú.
+        if (link.getAttribute('data-bs-toggle') === 'collapse') {
+            return;
+        }
+
+        e.preventDefault();
+        const targetId = link.getAttribute('href').substring(1);
+        navigateTo(targetId);
+    }
+
+    function navigateTo(moduleId) {
+        if (moduleId === 'control-personal') {
+            const currentHour = new Date().getHours();
+            // Permitir acceso solo en las ventanas de 7:00-7:59 y 16:00-16:59
+            if (currentHour !== 7 && currentHour !== 16) {
+                showToast('Acceso denegado. El registro de jornada laboral solo está disponible de 07:00 a 07:59 y de 16:00 a 16:59. Por favor, utilice el Pórtico.', 'error', 'Fuera de Horario');
+                // No navegar y mantener el módulo actual activo en el menú
+                const currentActive = document.querySelector('.nav-link.active').getAttribute('href').substring(1);
+                if (currentActive !== 'control-personal') {
+                     navLinks.forEach(link => {
+                        link.classList.toggle('active', link.getAttribute('href') === `#${currentActive}`);
+                    });
+                } else {
+                    // Si por alguna razón ya estaba activo, ir a inicio
+                    navigateTo('inicio');
+                }
+                return; 
+            }
+        }
+
+        mainContent.innerHTML = getModuleTemplate(moduleId);
+        bindModuleEvents(moduleId);
+
+        const allNavLinks = document.querySelectorAll('.nav-link');
+        const targetLink = document.querySelector(`.nav-link[href="#${moduleId}"]`);
+
+        // Remove active from all links
+        allNavLinks.forEach(link => link.classList.remove('active'));
+
+        if (targetLink) {
+            // Activate the target link
+            targetLink.classList.add('active');
+
+            // Check if it's a sub-menu item
+            const parentCollapse = targetLink.closest('.collapse');
+            if (parentCollapse) {
+                // Activate the parent toggle
+                const parentToggle = document.querySelector(`a[href="#${parentCollapse.id}"]`);
+                if (parentToggle) {
+                    parentToggle.classList.add('active');
+                }
+                // Ensure the parent collapse is shown
+                var bsCollapse = new bootstrap.Collapse(parentCollapse, {
+                    toggle: false // prevent toggling, just ensure it's shown
+                });
+                bsCollapse.show();
+            }
+        }
+    }
+    
+    async function bindModuleEvents(moduleId) {
+        switch(moduleId) {
+            case 'inicio':
+                initDashboardModule();
+                break;
+            case 'portico':
+                initPorticoModule();
+                break;
+            case 'mantenedor-personal':
+                initPersonalModule();
+                break;
+            case 'mantenedor-vehiculos':
+                initVehiculoModule();
+                break;
+            case 'mantenedor-visitas':
+                initVisitasModule();
+                break;
+            case 'mantenedor-comision':
+                initComisionModule();
+                break;
+            case 'mantenedor-empresas':
+                initEmpresasModule();
+                break;
+            case 'control-personal':
+                initControlPersonalModule();
+                break;
+            case 'control-vehiculos':
+                initControlVehiculoModule();
+                break;
+            case 'control-visitas':
+                initControlVisitasModule(); // Habilitado
+                break;
+            case 'estado-actual':
+                // initEstadoActualModule(); // TODO: Implementar
+                break;
+            case 'horas-extra':
+                initHorasExtraModule();
+                break;
+            case 'guardia-servicio':
+                initGuardiaServicioModule();
+                break;
+            case 'reportes':
+                initReportesModule();
+                break;
+            case 'gestion-usuarios':
+                // initUserManagementModule(); // TODO: Implementar
+                break;
+        }
+    }
+
+
+
+    // --- MÓDULO: HORAS EXTRA ---
+    function initHorasExtraModule() {
+        // Selectores de elementos del formulario
+        const form = mainContent.querySelector('#horas-extra-form');
+        const rutInput = mainContent.querySelector('#he-rut-personal');
+        const nombreDisplay = mainContent.querySelector('#he-nombre-personal');
+        const autorizaInput = mainContent.querySelector('#he-autorizado-por');
+        const autorizaDisplay = mainContent.querySelector('#he-nombre-autoriza');
+        const motivoSelect = mainContent.querySelector('#he-motivo');
+        const motivoOtroContainer = mainContent.querySelector('#he-motivo-otro-container');
+        const fechaFinInput = mainContent.querySelector('#he-fecha-fin');
+
+        // Valor inicial para la fecha
+        if (fechaFinInput) {
+            fechaFinInput.value = new Date().toISOString().split('T')[0];
+        }
+
+        // Asignar eventos del formulario
+        rutInput.addEventListener('blur', (e) => handleRutLookup(e.target, nombreDisplay));
+        autorizaInput.addEventListener('blur', (e) => handleRutLookup(e.target, autorizaDisplay));
+        motivoSelect.addEventListener('change', () => {
+            motivoOtroContainer.style.display = motivoSelect.value === 'OTRO' ? 'block' : 'none';
+        });
+        form.addEventListener('submit', handleHorasExtraSubmit);
+
+        // Cargar y mostrar el historial
+        loadAndRenderHorasExtraHistory();
+    }
+
+    async function loadAndRenderHorasExtraHistory() {
+        try {
+            const historyData = await api.getHorasExtra();
+            renderHorasExtraTable(historyData);
+        } catch (error) {
+            showToast(error.message, 'error');
+            const logTableBody = mainContent.querySelector('#horas-extra-log-table');
+            if (logTableBody) {
+                logTableBody.innerHTML = `<tr><td colspan="5" class="text-center text-danger p-4">Error al cargar el historial.</td></tr>`;
+            }
+        }
+    }
+
+    function renderHorasExtraTable(data) {
+        const logTableBody = mainContent.querySelector('#horas-extra-log-table');
+        if (!logTableBody) return;
+
+        if (data.length === 0) {
+            logTableBody.innerHTML = '<tr><td colspan="5" class="text-center text-muted p-4">No hay registros de horas extra.</td></tr>'
+            return;
+        }
+
+        logTableBody.innerHTML = '';
+        data.forEach(record => {
+            const fechaTermino = new Date(record.fecha_hora_termino);
+            const fechaFormateada = fechaTermino.toLocaleDateString('es-CL');
+            const horaFormateada = fechaTermino.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+            const motivoCompleto = record.motivo_detalle ? (record.motivo + ': ' + record.motivo_detalle) : record.motivo;
+            logTableBody.innerHTML += '<tr>' +
+                '<td><div>' + record.personal_nombre + '</div>' +
+                '<small class="text-muted">RUT: ' + record.personal_rut + '</small></td>' +
+                '<td>' + fechaFormateada + '</td>' +
+                '<td>' + motivoCompleto + '</td>' +
+                '<td>' + horaFormateada + '</td>' +
+                '<td>' +
+                    '<button class="btn btn-sm btn-outline-danger delete-he-btn" data-id="' + record.id + '" title="Eliminar">' +
+                        '<i class="bi bi-trash"></i>' +
+                    '</button>' +
+                '</td>' +
+            '</tr>';
+        });
+
+        bindHorasExtraTableEvents();
+    }
+
+    function bindHorasExtraTableEvents() {
+        mainContent.querySelectorAll('.delete-he-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const id = e.currentTarget.dataset.id;
+                handleDeleteHorasExtra(id);
+            });
+        });
+    }
+
+    async function handleDeleteHorasExtra(id) {
+        if (confirm('¿Estás seguro de que quieres eliminar este registro de horas extra?')) {
+            try {
+                await api.deleteHorasExtra(id);
+                showToast('Registro eliminado correctamente.', 'success');
+                loadAndRenderHorasExtraHistory(); // Recargar la tabla
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+    }
+
+    async function handleRutLookup(inputElement, displayElement) {
+        const rut = inputElement.value.trim();
+        displayElement.textContent = '';
+        displayElement.removeAttribute('data-nombre-completo');
+        inputElement.classList.remove('is-invalid', 'is-valid');
+
+        if (!rut) return;
+
+        // ✨ POC: Validar formato de RUT antes de buscar (solo números, sin DV)
+        if (!validarRUT(rut)) {
+            displayElement.textContent = 'RUT inválido (ingrese solo números, 7-8 dígitos, sin dígito verificador)';
+            displayElement.classList.remove('text-success');
+            displayElement.classList.add('text-danger');
+            inputElement.classList.add('is-invalid');
+            return;
+        }
+
+        try {
+            // Primero intentar buscar por RUT
+            const personaByRut = await api.findPersonalByRut(rut);
+            if (personaByRut && personaByRut.Nombres) {
+                const materno = (personaByRut.Materno === 'undefined' || personaByRut.Materno === null) ? '' : personaByRut.Materno;
+                const nombreCompleto = `${personaByRut.Grado || ''} ${personaByRut.Nombres || ''} ${personaByRut.Paterno || ''} ${materno}`.trim();
+                displayElement.textContent = nombreCompleto;
+                displayElement.setAttribute('data-nombre-completo', nombreCompleto);
+                displayElement.classList.remove('text-danger');
+                displayElement.classList.add('text-success');
+                inputElement.classList.add('is-valid');
+                return;
+            }
+
+            // Si no se encuentra por RUT, intentar buscar como FUNCIONARIO
+            const results = await api.searchPersonal(rut, 'FUNCIONARIO');
+            if (results && results.length > 0) {
+                const persona = results[0]; // Tomar el primer resultado
+                const materno = (persona.Materno === 'undefined' || persona.Materno === null) ? '' : persona.Materno;
+                const nombreCompleto = `${persona.Grado || ''} ${persona.Nombres || ''} ${persona.Paterno || ''} ${materno}`.trim();
+                displayElement.textContent = nombreCompleto;
+                displayElement.setAttribute('data-nombre-completo', nombreCompleto);
+                displayElement.classList.remove('text-danger');
+                displayElement.classList.add('text-success');
+                inputElement.classList.add('is-valid');
+                return;
+            }
+
+            // Si no se encuentra por ningún método
+            displayElement.textContent = 'RUT o nombre no encontrado';
+            displayElement.classList.remove('text-success');
+            displayElement.classList.add('text-danger');
+            inputElement.classList.add('is-invalid');
+
+        } catch (error) {
+            showToast(error.message, 'error');
+            displayElement.textContent = 'Error al buscar RUT/Nombre';
+            displayElement.classList.add('text-danger');
+            inputElement.classList.add('is-invalid');
+        }
+    }
+
+    function initHorasExtraModule() {
+        let personalList = [];
+
+        const form = mainContent.querySelector('#horas-extra-form');
+        const rutInput = mainContent.querySelector('#he-rut-input');
+        const addPersonBtn = mainContent.querySelector('#he-add-person-btn');
+        const rutLookupNombre = mainContent.querySelector('#he-rut-lookup-nombre');
+        const personalListUl = mainContent.querySelector('#he-personal-list');
+        const autorizaInput = mainContent.querySelector('#he-autorizado-por');
+        const autorizaDisplay = mainContent.querySelector('#he-nombre-autoriza');
+        const motivoSelect = mainContent.querySelector('#he-motivo');
+        const motivoOtroContainer = mainContent.querySelector('#he-motivo-otro-container');
+        const fechaFinInput = mainContent.querySelector('#he-fecha-fin');
+
+        if (fechaFinInput) {
+            fechaFinInput.value = new Date().toISOString().split('T')[0];
+        }
+
+        function renderPersonalList() {
+            personalListUl.innerHTML = personalList.map((person, index) => `
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <span>${person.nombre} (${person.rut})</span>
+                    <button type="button" class="btn-close" aria-label="Remove" data-index="${index}"></button>
+                </li>
+            `).join('');
+        }
+
+        rutInput.addEventListener('keyup', (e) => {
+            handleRutLookup(e.target, rutLookupNombre);
+        });
+
+        addPersonBtn.addEventListener('click', async () => {
+            const rut = rutInput.value.trim();
+            if (!rut) return;
+
+            if (personalList.some(p => p.rut === rut)) {
+                showToast('Esta persona ya está en la lista.', 'warning');
+                return;
+            }
+
+            try {
+                const persona = await api.findPersonalByRut(rut);
+                if (persona && persona.Nombres) {
+                    const nombreCompleto = `${persona.Grado || ''} ${persona.Nombres || ''} ${persona.Paterno || ''} ${persona.Materno || ''}`.trim();
+                    personalList.push({ rut: persona.NrRut, nombre: nombreCompleto });
+                    renderPersonalList();
+                    rutInput.value = '';
+                    rutLookupNombre.textContent = '';
+                    rutInput.classList.remove('is-valid', 'is-invalid');
+                } else {
+                    showToast('RUT no encontrado.', 'error');
+                }
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        });
+
+        personalListUl.addEventListener('click', (e) => {
+            if (e.target.matches('.btn-close')) {
+                const index = parseInt(e.target.dataset.index, 10);
+                personalList.splice(index, 1);
+                renderPersonalList();
+            }
+        });
+
+        autorizaInput.addEventListener('blur', (e) => handleRutLookup(e.target, autorizaDisplay));
+        motivoSelect.addEventListener('change', () => {
+            motivoOtroContainer.style.display = motivoSelect.value === 'OTRO' ? 'block' : 'none';
+        });
+
+        form.addEventListener('submit', (e) => {
+            e.preventDefault(); // Prevent default form submission
+            handleHorasExtraSubmit(e, personalList, renderPersonalList); // Pass render function
+        });
+
+        loadAndRenderHorasExtraHistory();
+    }
+
+    async function handleHorasExtraSubmit(e, personalList, renderPersonalList) {
+        const form = e.target;
+
+        if (personalList.length === 0) {
+            showToast('Debe agregar al menos una persona a la lista.', 'error');
+            return;
+        }
+
+        const autorizaRut = form.querySelector('#he-autorizado-por').value;
+        const autorizaDisplay = form.querySelector('#he-nombre-autoriza');
+        const autorizaNombre = autorizaDisplay.getAttribute('data-nombre-completo');
+
+        if (!autorizaRut.trim() || !autorizaNombre) {
+            showToast('Debe ingresar un RUT válido para quien autoriza.', 'error');
+            return;
+        }
+        
+        const fechaFin = form.querySelector('#he-fecha-fin').value;
+        const horaFin = form.querySelector('#he-hora-fin').value;
+        const motivo = form.querySelector('#he-motivo').value;
+        const motivoDetalle = form.querySelector('#he-motivo-otro').value;
+
+        if (!fechaFin || !horaFin || !motivo) {
+            showToast('Por favor, complete la fecha, hora y motivo.', 'error');
+            return;
+        }
+        if (motivo === 'OTRO' && !motivoDetalle.trim()) {
+            showToast('Por favor, especifique el motivo en el cuadro de texto.', 'error');
+            return;
+        }
+
+        const data = {
+            personal: personalList.map(p => ({ rut: p.rut, nombre: p.nombre })),
+            fecha_hora_termino: `${fechaFin} ${horaFin}:00`,
+            motivo: motivo,
+            motivo_detalle: motivo === 'OTRO' ? motivoDetalle : null,
+            autorizado_por_rut: autorizaRut,
+            autorizado_por_nombre: autorizaNombre
+        };
+
+        try {
+            await api.createHorasExtra(data); 
+            showToast('Registros de horas extra guardados correctamente.', 'success');
+            form.reset();
+            personalList.length = 0;
+            if(renderPersonalList) renderPersonalList();
+            autorizaDisplay.textContent = '';
+            form.querySelectorAll('.form-control').forEach(el => el.classList.remove('is-valid', 'is-invalid'));
+            form.querySelector('#he-motivo-otro-container').style.display = 'none';
+            form.querySelector('#he-fecha-fin').value = new Date().toISOString().split('T')[0];
+
+            loadAndRenderHorasExtraHistory();
+
+        } catch (error) {
+            showToast(error.message, 'error');
+        }
+    }
+
+    // --- LÓGICA DE MÓDULOS ---
+
+    let porticoAllLogs = [];
+
+    async function loadAndRenderPorticoLogs() {
+        try {
+            const [personalLogs, vehiculoLogs, visitaLogs, comisionLogs, empresaLogs] = await Promise.all([
+                api.getAccessLogs('personal'),
+                api.getAccessLogs('vehiculo'),
+                api.getAccessLogs('visita'),
+                api.getAccessLogs('personal_comision'),
+                api.getAccessLogs('empresa_empleado')
+            ]);
+
+            porticoAllLogs = [...personalLogs, ...vehiculoLogs, ...visitaLogs, ...comisionLogs, ...empresaLogs];
+            porticoAllLogs.sort((a, b) => new Date(b.log_time) - new Date(a.log_time));
+
+            renderPorticoLogTable(porticoAllLogs);
+            
+            const searchInput = mainContent.querySelector('#search-portico-log');
+            if (searchInput && searchInput.value) {
+                searchInput.dispatchEvent(new Event('input'));
+            }
+        } catch (error) {
+            showToast(error.message, 'error');
+        }
+    }
+
+async function handleScanPorticoSubmit(e) {
+    e.preventDefault();
+    const scanInput = mainContent.querySelector('#scan-portico-input');
+    const targetId = scanInput.value.trim();
+    if (!targetId) return;
+
+    try {
+        // Establecemos un bloqueo temporal para evitar múltiples escaneos
+        if (window.scanInProgress) {
+            console.log('Escaneo en progreso, espere...');
+            return;
+        }
+        window.scanInProgress = true;
+        
+        // Limpiamos cualquier feedback anterior para evitar transiciones raras
+        const feedbackEl = mainContent.querySelector('#portico-scan-feedback');
+        if (feedbackEl) feedbackEl.innerHTML = '';
+        
+        // Limpiar TODOS los temporizadores pendientes
+        if (window.feedbackTimers) {
+            Object.keys(window.feedbackTimers).forEach(timerId => {
+                clearTimeout(window.feedbackTimers[timerId]);
+                delete window.feedbackTimers[timerId];
+            });
+        }
+
+        const result = await api.logPorticoAccess(targetId);
+        
+        // Depuración para ver el resultado exacto con el nombre
+        console.log('Respuesta de portico.php:', result);
+        
+        // Reproducir sonido de éxito
+        playScanSound('success');
+
+        if (result.action === 'clarification_required') {
+            console.log('Detalles de persona para clarificación:', result.person_details);
+            showClarificationModal(result.person_details, async () => {
+                // Actualizamos los logs pero no tocamos el feedback
+                await loadAndRenderPorticoLogs();
+            });
+        } else {
+            showToast(result.message || 'Acceso registrado con éxito.', 'success');
+            // Primero actualizamos los logs de la tabla sin tocar el feedback
+            await loadAndRenderPorticoLogs();
+            // Luego mostramos el feedback
+            renderPorticoScanFeedback(result, 'success');
+        }
+    } catch (error) {
+        // Reproducir sonido de error
+        playScanSound('error');
+        
+        showToast(error.message, 'error');
+        renderPorticoScanFeedback({ message: error.message }, 'error');
+    } finally {
+        // Desactivamos el bloqueo
+        window.scanInProgress = false;
+        scanInput.value = '';
+        scanInput.focus();
+    }
+}    // Variable para el intervalo de actualización del pórtico
+    let porticoRefreshInterval = null;
+    
+    async function refreshPortico() {
+        try {
+            // Si hay un escaneo en progreso o hay tarjetas de feedback activas, no actualizamos
+            if (window.scanInProgress || (window.feedbackTimers && Object.keys(window.feedbackTimers).length > 0)) {
+                console.log('Actualización automática pospuesta: hay un escaneo en progreso o tarjetas de feedback activas');
+                return;
+            }
+            
+            console.log('Actualizando solo la tabla de registros del pórtico...');
+            
+            try {
+                const [personalLogs, vehiculoLogs, visitaLogs, comisionLogs, empresaLogs] = await Promise.all([
+                    api.getAccessLogs('personal'),
+                    api.getAccessLogs('vehiculo'),
+                    api.getAccessLogs('visita'),
+                    api.getAccessLogs('personal_comision'),
+                    api.getAccessLogs('empresa_empleado')
+                ]);
+
+                porticoAllLogs = [...personalLogs, ...vehiculoLogs, ...visitaLogs, ...comisionLogs, ...empresaLogs];
+                porticoAllLogs.sort((a, b) => new Date(b.log_time) - new Date(a.log_time));
+
+                renderPorticoLogTable(porticoAllLogs);
+                
+                const searchInput = mainContent.querySelector('#search-portico-log');
+                if (searchInput && searchInput.value) {
+                    searchInput.dispatchEvent(new Event('input'));
+                }
+                
+                // Actualizar indicador de última actualización sin refrescar toda la página
+                const lastUpdateEl = document.querySelector('#portico-last-update');
+                if (lastUpdateEl) {
+                    const now = new Date();
+                    lastUpdateEl.textContent = `Última actualización: ${now.toLocaleTimeString()}`;
+                    lastUpdateEl.classList.remove('d-none');
+                }
+                
+                console.log('Tabla de registros del pórtico actualizada correctamente');
+            } catch (error) {
+                console.error('Error al actualizar los registros:', error);
+            }
+        } catch (error) {
+            console.error('Error al actualizar los registros del pórtico:', error);
+        }
+    }
+    
+    async function initPorticoModule() {
+        // Configurar formulario de escaneo
+        const scanForm = mainContent.querySelector('#scan-portico-form');
+        const scanInput = mainContent.querySelector('#scan-portico-input');
+        const scanSection = mainContent.querySelector('#portico-scan-section');
+        
+        // Instrucciones visuales ahora en ui.js, no las agregamos dinámicamente
+        // if (scanSection) {
+        //     const helpText = document.createElement('div');
+        //     helpText.className = 'text-center mb-3';
+        //     helpText.innerHTML = `
+        //         <div class="alert alert-info py-2">
+        //             <i class="bi bi-info-circle-fill me-1"></i> 
+        //             Escanee el código QR o ingrese el RUT sin dígito verificador
+        //         </div>
+        //     `;
+        //     scanSection.insertBefore(helpText, scanForm.nextSibling);
+        // }
+        
+        // Mejorar el campo de escaneo con un indicador visual
+        if (scanInput) {
+            scanInput.classList.add('form-control-lg');
+            scanInput.setAttribute('placeholder', 'Escanee o ingrese RUT sin dígito verificador...');
+            scanInput.style.borderWidth = '2px';
+            
+            // Añadir evento de enfoque para destacar visualmente el campo activo
+            scanInput.addEventListener('focus', () => {
+                scanInput.style.borderColor = '#0d6efd';
+                scanInput.style.boxShadow = '0 0 0 0.25rem rgba(13, 110, 253, 0.25)';
+            });
+            
+            scanInput.addEventListener('blur', () => {
+                scanInput.style.borderColor = '';
+                scanInput.style.boxShadow = '';
+            });
+        }
+        
+        // Configurar manejo del formulario
+        scanForm.addEventListener('submit', handleScanPorticoSubmit);
+        
+        // Al cargar, enfocamos automáticamente el campo de entrada con un efecto visual
+        setTimeout(() => {
+            if (scanInput) {
+                scanInput.focus();
+                // Efecto visual para indicar que el campo está listo para escanear
+                scanInput.classList.add('scan-ready-pulse');
+                setTimeout(() => {
+                    scanInput.classList.remove('scan-ready-pulse');
+                }, 1500);
+            }
+        }, 500);
+        
+        // Configurar enfoque inicial al cargar el formulario
+        if (scanForm) {
+            scanForm.setAttribute('title', 'Escanee código QR o ingrese ID manualmente');
+        }
+        
+        // Configurar botón de actualización con mejor feedback visual
+        const refreshBtn = mainContent.querySelector('#refresh-portico-btn');
+        if (refreshBtn) {
+            // Agregar tooltip para mejorar la UX
+            refreshBtn.setAttribute('title', 'Actualizar registros manualmente (F5)');
+            refreshBtn.classList.add('btn-sm', 'text-nowrap');
+            
+            refreshBtn.addEventListener('click', async () => {
+                try {
+                    refreshBtn.disabled = true;
+                    refreshBtn.innerHTML = '<i class="bi bi-arrow-clockwise spin"></i> Actualizando...';
+                    await refreshPortico();
+                    refreshBtn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Actualizar';
+                    showToast('Registros actualizados correctamente', 'success');
+                    
+                    // Indicador visual de última actualización
+                    const lastUpdateEl = document.querySelector('#portico-last-update');
+                    if (lastUpdateEl) {
+                        const now = new Date();
+                        lastUpdateEl.textContent = `Última actualización: ${now.toLocaleTimeString()}`;
+                        lastUpdateEl.classList.remove('d-none');
+                    }
+                    
+                    // Volver a enfocar el campo de escaneo después de actualizar
+                    if (scanInput) scanInput.focus();
+                } catch (error) {
+                    showToast('Error al actualizar registros', 'error');
+                } finally {
+                    refreshBtn.disabled = false;
+                }
+            });
+        }
+        
+        // Mejorar la sección de búsqueda
+        const searchInput = mainContent.querySelector('#search-portico-log');
+        const clearSearchBtn = mainContent.querySelector('#clear-portico-search');
+        const searchSection = searchInput ? searchInput.closest('.input-group') : null;
+        
+        // Mejorar visualmente el campo de búsqueda
+        if (searchInput) {
+            searchInput.setAttribute('placeholder', 'Buscar por nombre, RUT o ID...');
+            searchInput.setAttribute('title', 'Ingrese texto para filtrar los registros');
+            
+            // Añadir icono de búsqueda
+            if (searchSection) {
+                const searchPrepend = document.createElement('span');
+                searchPrepend.className = 'input-group-text bg-light';
+                searchPrepend.innerHTML = '<i class="bi bi-search"></i>';
+                searchSection.insertBefore(searchPrepend, searchInput);
+            }
+        }
+        
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                const searchTerm = e.target.value.toLowerCase().trim();
+                if (!porticoAllLogs) return;
+                
+                // Mostrar u ocultar el botón de limpiar según haya texto o no
+                if (clearSearchBtn) {
+                    clearSearchBtn.style.display = searchTerm ? 'block' : 'none';
+                }
+                
+                const filteredLogs = porticoAllLogs.filter(log => {
+                    const name = (log.name || log.nombre || log.patente || '').toLowerCase();
+                    const rut = (log.rut || '').toLowerCase();
+                    const id = (log.target_id || '').toString().toLowerCase();
+                    const tipo = (log.type || '').toLowerCase();
+                    const empresa = (log.empresa_nombre || log.empresa || '').toLowerCase();
+                    
+                    return name.includes(searchTerm) || 
+                           rut.includes(searchTerm) || 
+                           id.includes(searchTerm) ||
+                           tipo.includes(searchTerm) ||
+                           empresa.includes(searchTerm);
+                });
+                
+                renderPorticoLogTable(filteredLogs);
+                
+                // Indicador de resultados de búsqueda
+                const resultCount = mainContent.querySelector('#portico-search-result-count');
+                if (resultCount) {
+                    resultCount.textContent = `${filteredLogs.length} resultado(s) encontrado(s)`;
+                    resultCount.style.display = searchTerm ? 'block' : 'none';
+                }
+            });
+        }
+        
+        // Mejorar el botón para limpiar la búsqueda
+        if (clearSearchBtn) {
+            clearSearchBtn.innerHTML = '<i class="bi bi-x-circle-fill"></i>';
+            clearSearchBtn.classList.add('btn-outline-secondary');
+            clearSearchBtn.setAttribute('title', 'Limpiar búsqueda');
+            clearSearchBtn.style.display = 'none'; // Inicialmente oculto
+            
+            clearSearchBtn.addEventListener('click', () => {
+                if (searchInput) {
+                    searchInput.value = '';
+                    renderPorticoLogTable(porticoAllLogs);
+                    
+                    // Ocultar el contador de resultados
+                    const resultCount = mainContent.querySelector('#portico-search-result-count');
+                    if (resultCount) resultCount.style.display = 'none';
+                    
+                    // Ocultar el propio botón de limpiar
+                    clearSearchBtn.style.display = 'none';
+                    
+                    // Volver a enfocar el campo de escaneo después de limpiar la búsqueda
+                    if (scanInput) scanInput.focus();
+                }
+            });
+        }
+        
+        // Añadir contador de resultados de búsqueda
+        if (searchSection && !mainContent.querySelector('#portico-search-result-count')) {
+            const resultCount = document.createElement('div');
+            resultCount.id = 'portico-search-result-count';
+            resultCount.className = 'small text-muted mt-1';
+            resultCount.style.display = 'none';
+            searchSection.parentNode.appendChild(resultCount);
+        }
+        
+        // Añadir indicador de última actualización
+        const tableContainer = mainContent.querySelector('#portico-logs-container');
+        if (tableContainer && !mainContent.querySelector('#portico-last-update')) {
+            const lastUpdateEl = document.createElement('div');
+            lastUpdateEl.id = 'portico-last-update';
+            lastUpdateEl.className = 'small text-muted text-end mb-2 d-none';
+            tableContainer.insertBefore(lastUpdateEl, tableContainer.firstChild);
+        }
+        
+        // Configurar actualizaciones automáticas (menos frecuente, cada 5 minutos)
+        if (porticoRefreshInterval) {
+            clearInterval(porticoRefreshInterval);
+        }
+        
+        // Añadimos un checkbox para controlar las actualizaciones automáticas
+        const refreshControlArea = document.createElement('div');
+        refreshControlArea.className = 'mt-3 mb-2 d-flex justify-content-end align-items-center';
+        refreshControlArea.innerHTML = `
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="portico-auto-refresh" checked>
+                <label class="form-check-label small text-muted" for="portico-auto-refresh">Actualización automática (cada 1 min)</label>
+            </div>
+        `;
+        
+        const porticoControlsContainer = mainContent.querySelector('#portico-controls-container') || 
+                                        mainContent.querySelector('#search-portico-container');
+        if (porticoControlsContainer) {
+            porticoControlsContainer.appendChild(refreshControlArea);
+        }
+        
+        const autoRefreshCheckbox = mainContent.querySelector('#portico-auto-refresh');
+        
+        // Configurar el intervalo (solo si el checkbox está marcado)
+        function setupPorticoAutoRefresh() {
+            if (porticoRefreshInterval) {
+                clearInterval(porticoRefreshInterval);
+                porticoRefreshInterval = null;
+            }
+            
+            if (autoRefreshCheckbox && autoRefreshCheckbox.checked) {
+                porticoRefreshInterval = setInterval(async () => {
+                    await refreshPortico();
+                    // Actualizar indicador de última actualización
+                    const lastUpdateEl = document.querySelector('#portico-last-update');
+                    if (lastUpdateEl) {
+                        const now = new Date();
+                        lastUpdateEl.textContent = `Última actualización automática: ${now.toLocaleTimeString()}`;
+                        lastUpdateEl.classList.remove('d-none');
+                    }
+                }, 60000); // 1 minuto (60,000 ms)
+                console.log('Actualización automática del pórtico configurada (cada 1 minuto)');
+            } else {
+                console.log('Actualización automática del pórtico desactivada');
+            }
+        }
+        
+        // Configuración inicial
+        setupPorticoAutoRefresh();
+        
+        // Evento para el checkbox
+        if (autoRefreshCheckbox) {
+            autoRefreshCheckbox.addEventListener('change', setupPorticoAutoRefresh);
+        }
+
+        // Carga inicial de registros
+        await loadAndRenderPorticoLogs();
+        
+        // Mostrar indicador de última actualización
+        const lastUpdateEl = document.querySelector('#portico-last-update');
+        if (lastUpdateEl) {
+            const now = new Date();
+            lastUpdateEl.textContent = `Última actualización: ${now.toLocaleTimeString()}`;
+            lastUpdateEl.classList.remove('d-none');
+        }
+    }
+
+    function showClarificationModal(personDetails, refreshCallback) {
+        const modalContainer = document.createElement('div');
+        modalContainer.id = 'clarification-modal-container';
+        modalContainer.classList.add('modal', 'fade');
+        modalContainer.tabIndex = -1;
+        
+        modalContainer.innerHTML = getClarificationModalTemplate(personDetails);
+        document.body.appendChild(modalContainer);
+
+        const modalEl = document.getElementById('clarification-modal-container');
+        const modal = new bootstrap.Modal(modalEl);
+
+        const radios = modalEl.querySelectorAll('input[name="clarificationReason"]');
+        const otrosDetailsContainer = modalEl.querySelector('#clarification-otros-details-container');
+        radios.forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                otrosDetailsContainer.style.display = e.target.value === 'otros' ? 'block' : 'none';
+            });
+        });
+
+        const submitBtn = modalEl.querySelector('#clarification-submit-btn');
+        submitBtn.addEventListener('click', async () => {
+            const reason = modalEl.querySelector('input[name="clarificationReason"]:checked').value;
+            const details = modalEl.querySelector('#clarification-otros-details').value;
+            const personId = submitBtn.dataset.personId;
+
+            if (reason === 'otros' && !details.trim()) {
+                showToast('Por favor, especifique el motivo en el cuadro de texto.', 'warning');
+                return;
+            }
+
+            try {
+                const result = await api.logClarifiedAccess({
+                    person_id: personId,
+                    reason: reason,
+                    details: details
+                });
+                
+                modal.hide();
+                showToast(result.message || 'Acceso registrado con éxito.', 'success');
+                renderPorticoScanFeedback(result, 'success');
+                if (refreshCallback) {
+                    await refreshCallback();
+                }
+
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        });
+
+        modalEl.addEventListener('hidden.bs.modal', () => {
+            document.body.removeChild(modalContainer);
+        });
+
+        modal.show();
+    }
+
+    // Objeto para almacenar los temporizadores activos
+    window.feedbackTimers = window.feedbackTimers || {};
+    
+    function renderPorticoScanFeedback(data, type) {
+        const feedbackEl = mainContent.querySelector('#portico-scan-feedback');
+        if (!feedbackEl) return;
+        
+        // Generar un ID único para esta tarjeta de feedback
+        const cardId = `feedback-card-${Date.now()}`;
+        
+        // Limpiar cualquier tarjeta existente
+        feedbackEl.innerHTML = '';
+        
+        // Limpiar TODOS los temporizadores pendientes
+        Object.keys(window.feedbackTimers).forEach(timerId => {
+            clearTimeout(window.feedbackTimers[timerId]);
+            delete window.feedbackTimers[timerId];
+        });
+        
+        // Crear un nuevo elemento de tarjeta con ID único
+        const cardEl = document.createElement('div');
+        cardEl.id = cardId;
+        cardEl.className = 'card shadow-sm border-0 mt-4';
+        
+        // Aplicar animación de entrada usando transiciones CSS en lugar de clases animate
+        cardEl.style.opacity = '0';
+        cardEl.style.transform = 'translateY(-10px)';
+        cardEl.style.transition = 'opacity 0.5s ease-in, transform 0.5s ease-in';
+        
+        // Aplicar un pequeño retraso para que la transición se active
+        setTimeout(() => {
+            cardEl.style.opacity = '1';
+            cardEl.style.transform = 'translateY(0)';
+        }, 10);
+        
+        if (type === 'success') {
+            const isEntrada = data.action === 'entrada';
+            const bgColorClass = isEntrada ? 'bg-success-subtle' : 'bg-danger-subtle';
+            const textColorClass = isEntrada ? 'text-success-emphasis' : 'text-danger-emphasis';
+            const iconClass = isEntrada ? 'bi bi-box-arrow-in-right' : 'bi bi-box-arrow-right';
+            const actionText = isEntrada ? 'ENTRADA' : 'SALIDA';
+            
+            const currentTime = new Date().toLocaleTimeString();
+            const currentDate = new Date().toLocaleDateString('es-CL');
+            
+            // Determinar el tipo de entidad y su icono
+            let entityIcon = '';
+            let entityTypeText = '';
+            let photoHtml = '';
+            
+            switch(data.type) {
+                case 'personal':
+                    entityIcon = 'bi bi-person-badge';
+                    entityTypeText = 'Personal';
+                    if (data.photoUrl) {
+                        photoHtml = `<img src="../foto-emple/${data.photoUrl}" class="rounded-circle mx-auto mb-3 img-thumbnail" width="96" height="96" style="object-fit: cover;" alt="Foto de ${data.name}">`;
+                    }
+                    break;
+                case 'empresa_empleado':
+                    entityIcon = 'bi bi-building';
+                    entityTypeText = 'Empresa';
+                    break;
+                case 'vehiculo':
+                    entityIcon = 'bi bi-car-front';
+                    entityTypeText = 'Vehículo';
+                    break;
+                case 'visita':
+                    entityIcon = 'bi bi-person-vcard';
+                    entityTypeText = 'Visita';
+                    break;
+                case 'personal_comision':
+                    entityIcon = 'bi bi-briefcase';
+                    entityTypeText = 'Personal en Comisión';
+                    break;
+                default:
+                    entityIcon = 'bi bi-person';
+                    entityTypeText = data.type || 'Desconocido';
+            }
+            
+            // Construir detalles adicionales según el tipo de entidad
+            let detailsHtml = '';
+            
+            if (data.type === 'empresa_empleado') {
+                detailsHtml = `<div class="d-flex flex-column align-items-center mt-3">
+                    <hr class="w-50 my-2" />
+                    <div class="d-flex flex-column gap-3">
+                        <div class="text-center">
+                            <div class="d-inline-flex align-items-center justify-content-center bg-${isEntrada ? 'success' : 'danger'}-subtle rounded-3 px-4 py-2 shadow-sm">
+                                <i class="bi bi-building-fill me-2 text-${isEntrada ? 'success' : 'danger'}-emphasis fs-5"></i>
+                                <span class="fw-medium text-${isEntrada ? 'success' : 'danger'}-emphasis">
+                                    ${data.empresa_nombre || 'Empresa no especificada'}
+                                </span>
+                            </div>
+                        </div>
+                        ${data.cargo ? `
+                        <div class="text-center mt-1">
+                            <div class="badge bg-secondary-subtle text-secondary px-3 py-2">
+                                <i class="bi bi-briefcase me-1"></i> Cargo: ${data.cargo}
+                            </div>
+                        </div>` : ''}
+                        ${data.rut ? `
+                        <div class="text-center mt-1">
+                            <div class="badge bg-dark-subtle text-dark px-3 py-2">
+                                <i class="bi bi-person-vcard me-1"></i> RUT: ${data.rut}
+                            </div>
+                        </div>` : ''}
+                    </div>
+                </div>`;
+            } else if (data.type === 'vehiculo') {
+                // Para vehículos, mostramos la información del vehículo de forma más integrada
+                detailsHtml = `<div class="d-flex flex-column align-items-center mt-3">
+                    <hr class="w-50 my-2" />
+                    <div class="d-flex flex-column gap-3 w-100">
+                        ${data.tipo ? `
+                        <div class="d-flex align-items-center justify-content-center">
+                            <div class="badge bg-${isEntrada ? 'success' : 'danger'}-subtle text-${isEntrada ? 'success' : 'danger'} px-3 py-2">
+                                <i class="bi bi-tag-fill me-1"></i> ${data.tipo}
+                            </div>
+                        </div>` : ''}
+                        ${data.personalName ? `
+                        <div class="text-center">
+                            <div class="d-inline-flex align-items-center justify-content-center bg-${isEntrada ? 'success' : 'danger'}-subtle text-${isEntrada ? 'success' : 'danger'}-emphasis rounded-pill px-3 py-1">
+                                <i class="bi bi-person-circle me-2"></i>
+                                <span>Propietario: <strong>${data.personalName}</strong></span>
+                            </div>
+                        </div>` : ''}
+                    </div>
+                </div>`;
+            } else if (data.type === 'personal') {
+                const rutText = data.personalRut ? `<small class="d-block text-muted">RUT: ${data.personalRut}</small>` : '';
+                detailsHtml = `<div class="mt-1">${rutText}</div>`;
+            }
+            
+            cardEl.innerHTML = `
+                <div class="card-header d-flex justify-content-between align-items-center ${bgColorClass}">
+                    <span class="fw-bold ${textColorClass}">
+                        <i class="${iconClass} me-1"></i> Registro Exitoso
+                    </span>
+                    <div class="text-end">
+                        <small class="text-muted d-block">${currentTime}</small>
+                        <small class="text-muted">${currentDate}</small>
+                    </div>
+                </div>
+                <div class="card-body text-center p-4 rounded-bottom ${bgColorClass}">
+                    ${photoHtml}
+                    ${data.type === 'vehiculo' ? 
+                        `<div class="mb-3 mt-1">
+                            <div class="d-flex flex-column align-items-center">
+                                <div class="mb-1">
+                                    <i class="bi bi-car-front fs-1 text-${isEntrada ? 'success' : 'danger'}-emphasis"></i>
+                                </div>
+                                <div class="bg-dark text-white px-4 py-2 rounded-3 border border-2 border-${isEntrada ? 'success' : 'danger'} shadow-sm" style="letter-spacing: 1.5px; font-family: 'Consolas', monospace; font-size: 1.5rem;">
+                                    <strong>${data.patente || data.name || 'Patente no disponible'}</strong>
+                                </div>
+                            </div>
+                        </div>` : 
+                        data.type === 'empresa_empleado' ?
+                        `<div class="mb-2 mt-1">
+                            <div class="d-flex flex-column align-items-center">
+                                <div class="mb-2">
+                                    <i class="bi bi-person-badge fs-1 text-${isEntrada ? 'success' : 'danger'}-emphasis"></i>
+                                </div>
+                                <div class="badge bg-${isEntrada ? 'success' : 'danger'}-subtle text-${isEntrada ? 'success' : 'danger'} mb-1">
+                                    <i class="bi bi-buildings me-1"></i> Empleado
+                                </div>
+                                <h3 class="h4 fw-bold mb-0 border-bottom border-${isEntrada ? 'success' : 'danger'} pb-1">${data.name || 'Desconocido'}</h3>
+                            </div>
+                        </div>` :
+                        `<h3 class="h5 fw-bold mb-1">${data.name || 'Desconocido'}</h3>`
+                    }
+                    <div class="badge ${isEntrada ? 'bg-success' : 'bg-danger'} text-white mb-2">
+                        <i class="${entityIcon} me-1"></i> ${entityTypeText}
+                    </div>
+                    ${detailsHtml}
+                    ${data.type === 'vehiculo' || data.type === 'empresa_empleado' ? `
+                    <div class="d-flex justify-content-center align-items-center mt-3">
+                        <span class="badge bg-${isEntrada ? 'success' : 'danger'} px-4 py-2 fs-5">
+                            <i class="${iconClass} me-2"></i>${actionText}
+                        </span>
+                    </div>
+                    ` : `
+                    <div class="d-flex justify-content-center align-items-center mt-3 mb-2">
+                        <div class="border rounded-circle p-2 ${isEntrada ? 'border-success' : 'border-danger'} me-2">
+                            <i class="${iconClass} fs-4 ${textColorClass}"></i>
+                        </div>
+                        <h4 class="m-0 ${textColorClass}">${actionText}</h4>
+                    </div>
+                    `}
+                    ${data.message ? `<div class="alert alert-${isEntrada ? 'success' : 'danger'} mt-3 mb-0 py-2 ${data.type === 'vehiculo' ? 'w-75 mx-auto' : ''} small">${data.message}</div>` : ''}
+                </div>`;
+        } else {
+            // Caso de error
+            const currentTime = new Date().toLocaleTimeString();
+            const currentDate = new Date().toLocaleDateString('es-CL');
+            
+            cardEl.innerHTML = `
+                <div class="card-header d-flex justify-content-between align-items-center bg-danger-subtle">
+                    <span class="fw-bold text-danger">
+                        <i class="bi bi-exclamation-triangle-fill me-1"></i> Error
+                    </span>
+                    <div class="text-end">
+                        <small class="text-muted d-block">${currentTime}</small>
+                        <small class="text-muted">${currentDate}</small>
+                    </div>
+                </div>
+                <div class="card-body text-center p-4 rounded-bottom bg-danger-subtle">
+                    <div class="d-flex justify-content-center mb-3">
+                        <div class="border border-danger rounded-circle d-flex align-items-center justify-content-center" style="width: 70px; height: 70px">
+                            <i class="bi bi-x-lg text-danger fs-1"></i>
+                        </div>
+                    </div>
+                    <h3 class="h5 fw-bold text-danger mb-3">Acceso Denegado</h3>
+                    <p class="alert alert-danger py-2">${data.message || 'Ha ocurrido un error al procesar su solicitud.'}</p>
+                    <p class="text-muted small mt-2">Verifique la información e intente nuevamente o contacte al administrador del sistema.</p>
+                </div>`;
+        }
+        
+        // Agregar la tarjeta al contenedor
+        feedbackEl.appendChild(cardEl);
+        
+        // Enfocar el campo de escaneo después de mostrar la respuesta
+        const scanInput = mainContent.querySelector('#scan-portico-input');
+        if (scanInput) scanInput.focus();
+        
+        // Configuramos un nuevo temporizador para ocultar la tarjeta después de un tiempo
+        window.feedbackTimers[`${cardId}-fade`] = setTimeout(() => {
+            // Buscamos la tarjeta específica por su ID único
+            const currentCard = document.getElementById(cardId);
+            
+            // Solo procedemos si la tarjeta específica aún existe en el DOM
+            if (currentCard && feedbackEl && feedbackEl.contains(currentCard)) {
+                // Aplicar una transición CSS suave en lugar de la clase animate
+                currentCard.style.transition = 'opacity 0.5s ease-out, transform 0.5s ease-out';
+                currentCard.style.opacity = '0';
+                currentCard.style.transform = 'translateY(-10px)';
+                
+                // Esperamos a que termine la transición CSS antes de eliminar
+                window.feedbackTimers[`${cardId}-cleanup`] = setTimeout(() => {
+                    // Buscamos nuevamente la tarjeta por su ID para asegurarnos de que aún existe
+                    const cardToRemove = document.getElementById(cardId);
+                    
+                    // Solo eliminamos si encontramos exactamente esta tarjeta
+                    if (cardToRemove && feedbackEl && feedbackEl.contains(cardToRemove)) {
+                        // Eliminamos solo esta tarjeta específica
+                        cardToRemove.remove();
+                        
+                        // Enfocamos de nuevo el campo de escaneo
+                        const scanInput = mainContent.querySelector('#scan-portico-input');
+                        if (scanInput) scanInput.focus();
+                    }
+                    
+                    // Limpiamos la referencia del temporizador
+                    delete window.feedbackTimers[`${cardId}-cleanup`];
+                }, 600); // 600ms para la transición (un poco más que la duración de la transición)
+            }
+            
+            // Limpiamos la referencia del temporizador
+            delete window.feedbackTimers[`${cardId}-fade`];
+        }, 15000);
+    }
+
+    function renderPorticoLogTable(logs) {
+        const tableBody = mainContent.querySelector('#portico-log-table');
+        const logCount = mainContent.querySelector('#portico-log-count');
+        
+        if (!tableBody) return;
+        
+        if (logCount) {
+            logCount.textContent = logs.length;
+        }
+        
+        if (logs.length === 0) {
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="5" class="text-center p-4">
+                        <div class="text-muted">
+                            <i class="bi bi-search fs-3 d-block mb-2"></i>
+                            <span class="fw-medium">No se encontraron registros</span>
+                            <small class="d-block mt-2">Los nuevos registros aparecerán aquí automáticamente</small>
+                        </div>
+                    </td>
+                </tr>`;
+            return;
+        }
+        
+        // Crear encabezado de la tabla con mejor estructura
+        tableBody.innerHTML = `
+            <tr class="table-light">
+                <th style="width: 5%" class="text-center">#</th>
+                <th style="width: 40%">Nombre/Identificación</th>
+                <th style="width: 15%" class="text-center">Tipo</th>
+                <th style="width: 15%" class="text-center">Acción</th>
+                <th style="width: 25%" class="text-center">Fecha/Hora</th>
+            </tr>
+        `;
+        
+        // Agregar filas de datos
+        logs.forEach((log, index) => {
+            let nameCellHtml;
+            let type;
+            let typeClass;
+            let iconHtml = '';
+
+            if (log.type === 'empresa_empleado') {
+                nameCellHtml = `
+                    <div class="d-flex flex-column">
+                        <div class="fw-semibold">${log.name || 'Empleado'}</div>
+                        <div class="d-flex align-items-center mt-1">
+                            <i class="bi bi-building-fill text-info me-1"></i>
+                            <small class="text-muted">${log.empresa_nombre || 'Empresa no especificada'}</small>
+                        </div>
+                    </div>`;
+                type = 'Empresa';
+                typeClass = 'bg-info-subtle text-info-emphasis';
+                iconHtml = '<i class="bi bi-building me-1"></i>';
+            } else if (log.type === 'personal') {
+                nameCellHtml = `
+                    <div class="d-flex flex-column">
+                        <div class="fw-semibold">${log.name || 'Personal'}</div>
+                        <div class="d-flex align-items-center mt-1">
+                            <i class="bi bi-person-vcard-fill text-primary me-1"></i>
+                            <small class="text-muted">RUT: ${log.rut || 'N/A'}</small>
+                        </div>
+                    </div>`;
+                type = 'Personal';
+                typeClass = 'bg-primary-subtle text-primary-emphasis';
+                iconHtml = '<i class="bi bi-person-badge me-1"></i>';
+            } else if (log.type === 'visita') {
+                const empresaText = log.empresa ? `<div class="d-flex align-items-center mt-1">
+                            <i class="bi bi-briefcase-fill text-warning me-1"></i>
+                            <small class="text-muted">${log.empresa}</small>
+                        </div>` : '';
+                nameCellHtml = `
+                    <div class="d-flex flex-column">
+                        <div class="fw-semibold">${log.nombre || 'Visita'}</div>
+                        ${empresaText}
+                    </div>`;
+                type = log.tipo || 'Visita';
+                typeClass = 'bg-warning-subtle text-warning-emphasis';
+                iconHtml = '<i class="bi bi-person me-1"></i>';
+            } else if (log.type === 'personal_comision') {
+                nameCellHtml = `
+                    <div class="d-flex flex-column">
+                        <div class="fw-semibold">${log.name || 'Personal en comisión'}</div>
+                        <div class="d-flex align-items-center mt-1">
+                            <i class="bi bi-briefcase-fill text-secondary me-1"></i>
+                            <small class="text-muted">Comisión de servicio</small>
+                        </div>
+                    </div>`;
+                type = 'Comisión';
+                typeClass = 'bg-secondary-subtle text-secondary-emphasis';
+                iconHtml = '<i class="bi bi-briefcase me-1"></i>';
+            } else if (log.type === 'vehiculo') {
+                const personalText = log.personalName ? `<div class="d-flex align-items-center mt-1">
+                            <i class="bi bi-person-fill text-success me-1"></i>
+                            <small class="text-muted">${log.personalName}</small>
+                        </div>` : '';
+                nameCellHtml = `
+                    <div class="d-flex flex-column">
+                        <div class="fw-semibold">${log.patente || 'Patente desconocida'}</div>
+                        ${personalText}
+                    </div>`;
+                type = 'Vehículo';
+                typeClass = 'bg-success-subtle text-success-emphasis';
+                iconHtml = '<i class="bi bi-car-front me-1"></i>';
+            } else {
+                nameCellHtml = `
+                    <div class="fw-semibold">${log.name || log.nombre || log.patente || log.target_id || 'Sin identificación'}</div>`;
+                type = log.type || 'Desconocido';
+                typeClass = 'bg-secondary-subtle text-secondary-emphasis';
+            }
+            
+            // Formatear la fecha y hora de manera más legible
+            const timestamp = log.timestamp || 'Sin fecha';
+            let datePart = '';
+            let timePart = '';
+            
+            if (timestamp && timestamp.includes(' ')) {
+                const [date, time] = timestamp.split(' ');
+                
+                // Formatear fecha como DD/MM/YYYY
+                if (date && date.includes('-')) {
+                    const [year, month, day] = date.split('-');
+                    datePart = `${day}/${month}/${year}`;
+                } else {
+                    datePart = date;
+                }
+                
+                timePart = time;
+            }
+            
+            // Crear la fila de la tabla
+            const row = document.createElement('tr');
+            row.className = index % 2 === 0 ? 'table-row-even' : 'table-row-odd';
+            row.innerHTML = `
+                <td class="text-center align-middle">
+                    <span class="badge rounded-pill bg-light text-dark border">${index + 1}</span>
+                </td>
+                <td class="align-middle">${nameCellHtml}</td>
+                <td class="text-center align-middle">
+                    <span class="badge ${typeClass} px-2 py-2">
+                        ${iconHtml}${type}
+                    </span>
+                </td>
+                <td class="text-center align-middle">
+                    <span class="badge ${log.action === 'entrada' ? 'bg-success' : 'bg-danger'} px-2 py-2">
+                        <i class="bi ${log.action === 'entrada' ? 'bi-box-arrow-in-right' : 'bi-box-arrow-right'} me-1"></i>
+                        ${log.action === 'entrada' ? 'Entrada' : 'Salida'}
+                    </span>
+                </td>
+                <td class="text-center align-middle">
+                    <div class="d-flex flex-column align-items-center">
+                        <span class="fw-medium">${timePart || ''}</span>
+                        <small class="text-muted">${datePart || ''}</small>
+                    </div>
+                </td>
+            `;
+            
+            tableBody.appendChild(row);
+        });
+    }
+
+    // Variable global para el intervalo de actualización del dashboard
+    let dashboardRefreshInterval = null;
+    
+    async function refreshDashboard() {
+        try {
+            console.log('Actualizando datos del dashboard...');
+            const dashboardData = await api.getDashboardData();
+            updateDashboardUI(dashboardData);
+            console.log('Dashboard actualizado correctamente');
+        } catch (error) {
+            console.error('Error al actualizar el dashboard:', error);
+            // No mostramos el toast para evitar mensajes constantes si hay un error persistente
+        }
+    }
+    
+    async function initDashboardModule() {
+        try {
+            console.log('Iniciando módulo dashboard...');
+            const dashboardData = await api.getDashboardData();
+            console.log('Datos del dashboard recibidos:', dashboardData);
+            updateDashboardUI(dashboardData);
+            console.log('UI del dashboard actualizada');
+
+            // Configurar actualización automática menos frecuente (cada 5 minutos)
+            if (dashboardRefreshInterval) {
+                clearInterval(dashboardRefreshInterval);
+            }
+            
+            // Añadimos un control para actualización automática junto al botón de actualizar
+            const refreshButton = document.getElementById('refresh-dashboard');
+            const refreshControlContainer = document.createElement('div');
+            refreshControlContainer.className = 'd-flex align-items-center gap-3';
+            
+            if (refreshButton && refreshButton.parentNode) {
+                // Creamos el switch de actualización automática
+                const autoRefreshSwitch = document.createElement('div');
+                autoRefreshSwitch.className = 'form-check form-switch ms-2';
+                autoRefreshSwitch.innerHTML = `
+                    <input class="form-check-input" type="checkbox" id="dashboard-auto-refresh" checked>
+                    <label class="form-check-label small text-muted" for="dashboard-auto-refresh">Auto (1 min)</label>
+                `;
+                
+                // Reemplazamos el botón original con nuestro contenedor
+                const parentNode = refreshButton.parentNode;
+                refreshControlContainer.appendChild(refreshButton);
+                refreshControlContainer.appendChild(autoRefreshSwitch);
+                parentNode.appendChild(refreshControlContainer);
+                
+                // Configuramos el evento para el switch
+                const autoRefreshCheckbox = document.getElementById('dashboard-auto-refresh');
+                
+                function setupDashboardAutoRefresh() {
+                    if (dashboardRefreshInterval) {
+                        clearInterval(dashboardRefreshInterval);
+                        dashboardRefreshInterval = null;
+                    }
+                    
+                    if (autoRefreshCheckbox && autoRefreshCheckbox.checked) {
+                        dashboardRefreshInterval = setInterval(refreshDashboard, 60000); // 1 minuto (60,000 ms)
+                        console.log('Actualización automática del dashboard configurada (cada 1 minuto)');
+                    } else {
+                        console.log('Actualización automática del dashboard desactivada');
+                    }
+                }
+                
+                // Configuración inicial
+                setupDashboardAutoRefresh();
+                
+                // Evento para el checkbox
+                if (autoRefreshCheckbox) {
+                    autoRefreshCheckbox.addEventListener('change', setupDashboardAutoRefresh);
+                }
+            } else {
+                // Si no podemos añadir el control, configuramos el intervalo de forma normal pero más largo
+                dashboardRefreshInterval = setInterval(refreshDashboard, 60000); // 1 minuto
+                console.log('Actualización automática del dashboard configurada (cada 1 minuto)');
+            }
+
+            const modalEl = document.getElementById('dashboard-detail-modal');
+            if (modalEl) {
+                modalEl.innerHTML = getDashboardDetailModalTemplate();
+                dashboardDetailModalInstance = new bootstrap.Modal(modalEl);
+                console.log('Modal del dashboard inicializado');
+            }
+
+            // Configurar botón de actualización del dashboard
+            // Ya tenemos la variable refreshButton declarada arriba, no es necesario declararla nuevamente
+            if (refreshButton) {
+                refreshButton.addEventListener('click', async () => {
+                    try {
+                        refreshButton.disabled = true;
+                        refreshButton.innerHTML = '<i class="bi bi-arrow-clockwise spin"></i> Actualizando...';
+                        await refreshDashboard();
+                        refreshButton.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Actualizar';
+                        showToast('Dashboard actualizado correctamente', 'success');
+                    } catch (error) {
+                        showToast('Error al actualizar el dashboard', 'error');
+                    } finally {
+                        refreshButton.disabled = false;
+                    }
+                });
+            }
+
+            mainContent.querySelectorAll('[data-category]').forEach(card => {
+                const category = card.dataset.category;
+                // Skip modal for 'personal-general-adentro'
+                if (category === 'personal-general-adentro') {
+                    card.style.cursor = 'default'; // Change cursor to indicate it's not clickable
+                    return; // Skip adding the event listener
+                }
+
+                card.style.cursor = 'pointer';
+                card.addEventListener('click', () => {
+                    const title = card.querySelector('.text-muted, .text-danger, .text-warning').textContent;
+                    openDashboardDetailModal(category, title);
+                });
+            });
+
+        } catch (error) {
+            showToast(error.message, 'error');
+        }
+    }
+
+    function updateDashboardUI(data) {
+        if (!data) return;
+
+        // Alertas (con visibilidad condicional)
+        const alertaAtrasadoContainer = document.getElementById('alerta-atrasado-container');
+        const alertaNoAutorizadoContainer = document.getElementById('alerta-no-autorizado-container');
+        const alertasTitle = document.getElementById('alertas-title');
+
+        const atrasadoCount = parseInt(data.alerta_atrasado_count ?? 0, 10);
+        const noAutorizadoCount = parseInt(data.alerta_no_autorizado_count ?? 0, 10);
+
+        if (alertaAtrasadoContainer) {
+            document.getElementById('alerta-atrasado-count').textContent = atrasadoCount;
+            alertaAtrasadoContainer.classList.toggle('d-none', atrasadoCount === 0);
+        }
+
+        if (alertaNoAutorizadoContainer) {
+            document.getElementById('alerta-no-autorizado-count').textContent = noAutorizadoCount;
+            alertaNoAutorizadoContainer.classList.toggle('d-none', noAutorizadoCount === 0);
+        }
+
+        if (alertasTitle) {
+            alertasTitle.classList.toggle('d-none', atrasadoCount === 0 && noAutorizadoCount === 0);
+        }
+
+        // Contadores de Personal
+        const pgac = document.getElementById('personal-general-adentro-count');
+        if (pgac) pgac.textContent = data.personal_general_adentro ?? '0';
+
+        const ptc = document.getElementById('personal-trabajando-count');
+        if (ptc) ptc.textContent = data.personal_trabajando ?? '0';
+
+        const prc = document.getElementById('personal-residiendo-count');
+        if (prc) prc.textContent = data.personal_residiendo ?? '0';
+
+        const poac = document.getElementById('personal-otras-actividades-count');
+        if (poac) poac.textContent = data.personal_otras_actividades ?? '0';
+
+        const pcc = document.getElementById('personal-en-comision-count');
+        if (pcc) pcc.textContent = data.personal_en_comision ?? '0';
+
+        const eac = document.getElementById('empresas-adentro-count');
+        if (eac) eac.textContent = data.empresas_adentro ?? '0';
+
+        const vac = document.getElementById('visitas-adentro-count');
+        if (vac) vac.textContent = data.visitas_adentro ?? '0';
+
+        // Contadores de Vehículos
+        const vfac = document.getElementById('vehiculos-funcionario-adentro-count');
+        if (vfac) vfac.textContent = data.vehiculos_funcionario_adentro ?? '0';
+
+        const vrac = document.getElementById('vehiculos-residente-adentro-count');
+        if (vrac) vrac.textContent = data.vehiculos_residente_adentro ?? '0';
+
+        const vvac = document.getElementById('vehiculos-visita-adentro-count');
+        if (vvac) vvac.textContent = data.vehiculos_visita_adentro ?? '0';
+
+        const vpac2 = document.getElementById('vehiculos-proveedor-adentro-count');
+        if (vpac2) vpac2.textContent = data.vehiculos_proveedor_adentro ?? '0';
+
+        const vfc = document.getElementById('vehiculos-fiscal-adentro-count');
+        if (vfc) vfc.textContent = data.vehiculos_fiscal_adentro ?? '0';
+
+    }
+
+    let dashboardDetailModalInstance = null;
+
+    async function openDashboardDetailModal(category, title) {
+        if (!dashboardDetailModalInstance) return;
+
+        const modalEl = document.getElementById('dashboard-detail-modal');
+        const modalTitle = modalEl.querySelector('#dashboard-detail-modal-title');
+        const tableHead = modalEl.querySelector('#dashboard-detail-table-head');
+        const tableBody = modalEl.querySelector('#dashboard-detail-table-body');
+        const searchInput = modalEl.querySelector('#dashboard-detail-search');
+
+        modalTitle.textContent = title;
+        tableHead.innerHTML = '';
+        tableBody.innerHTML = '<tr><td colspan="4" class="text-center">Cargando...</td></tr>';
+        dashboardDetailModalInstance.show();
+
+        try {
+            console.log(`Solicitando detalles para la categoría: ${category}`);
+            const data = await api.getDashboardDetails(category);
+            console.log(`Datos recibidos para ${category}:`, data);
+            let headers = '';
+            let rows = '';
+
+            if (category === 'personal-otras-actividades') {
+                headers = `<tr><th>Nombre</th><th>Móvil</th><th>Hora de Entrada</th><th>Motivo</th></tr>`;
+                rows = data.map(item => {
+                    const nombre = `${item.Grado || ''} ${item.Nombres} ${item.Paterno} ${item.Materno || ''}`.trim();
+                    const motivo = item.motivo || 'No especificado';
+                    const searchText = `${nombre} ${motivo}`.toLowerCase();
+                    return `<tr data-search-text="${searchText}">
+                                <td>${nombre}</td>
+                                <td>${item.movil1 || 'N/A'}</td>
+                                <td>${new Date(item.entry_time).toLocaleString('es-CL')}</td>
+                                <td>${motivo}</td>
+                            </tr>`;
+                }).join('');
+            } else if (category === 'alerta-atrasado') {
+                headers = `<tr><th>Nombre</th><th>Móvil</th><th>Unidad</th><th>Hora Salida Autorizada</th></tr>`;
+                rows = data.map(item => {
+                    const nombre = `${item.Grado || ''} ${item.Nombres} ${item.Paterno} ${item.Materno || ''}`.trim();
+                    const unidad = item.Unidad || 'N/A';
+                    const horaSalida = new Date(item.fecha_hora_termino).toLocaleString('es-CL');
+                    const searchText = `${nombre} ${unidad}`.toLowerCase();
+                    return `<tr data-search-text="${searchText}">
+                                <td>${nombre}</td>
+                                <td>${item.movil1 || 'N/A'}</td>
+                                <td>${unidad}</td>
+                                <td>${horaSalida}</td>
+                            </tr>`;
+                }).join('');
+            } else if (category === 'alerta-no-autorizado') {
+                headers = `<tr><th>Nombre</th><th>Móvil</th><th>Unidad</th><th>Hora de Entrada</th></tr>`;
+                rows = data.map(item => {
+                    const nombre = `${item.Grado || ''} ${item.Nombres} ${item.Paterno} ${item.Materno || ''}`.trim();
+                    const unidad = item.Unidad || 'N/A';
+                    const horaEntrada = new Date(item.entry_time).toLocaleString('es-CL');
+                    const searchText = `${nombre} ${unidad}`.toLowerCase();
+                    return `<tr data-search-text="${searchText}">
+                                <td>${nombre}</td>
+                                <td>${item.movil1 || 'N/A'}</td>
+                                <td>${unidad}</td>
+                                <td>${horaEntrada}</td>
+                            </tr>`;
+                }).join('');
+            } else if (category === 'personal-trabajando') {
+                headers = `<tr><th>Nombre</th><th>Móvil</th><th>Unidad</th><th>Hora de Entrada</th><th>Salida Posterior</th><th>Hora Salida</th></tr>`;
+                rows = data.map(item => {
+                    const nombre = `${item.Grado || ''} ${item.Nombres} ${item.Paterno} ${item.Materno || ''}`.trim();
+                    const unidad = item.Unidad || 'N/A';
+                    const tieneSalidaPosterior = item.fecha_hora_termino !== null;
+                    const salidaPosteriorTexto = tieneSalidaPosterior ? 'Sí' : 'No';
+                    const horaSalida = tieneSalidaPosterior ? new Date(item.fecha_hora_termino).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) : 'N/A';
+                    
+                    const searchText = `${nombre} ${unidad} ${salidaPosteriorTexto}`.toLowerCase();
+
+                    return `<tr data-search-text="${searchText}">
+                                <td>${nombre}</td>
+                                <td>${item.movil1 || 'N/A'}</td>
+                                <td>${unidad}</td>
+                                <td>${new Date(item.entry_time).toLocaleString('es-CL')}</td>
+                                <td><span class="badge ${tieneSalidaPosterior ? 'bg-success' : 'bg-secondary'}">${salidaPosteriorTexto}</span></td>
+                                <td>${horaSalida}</td>
+                            </tr>`;
+                }).join('');
+            } else if (category === 'personal-en-comision') {
+                headers = `<tr><th>Nombre</th><th>Unidad de Origen</th><th>Hora de Entrada</th></tr>`;
+                rows = data.map(item => {
+                    const nombre = item.nombre_completo || 'N/A';
+                    const unidad = item.unidad_origen || 'N/A';
+                    const horaEntrada = new Date(item.entry_time).toLocaleString('es-CL');
+                    const searchText = `${nombre} ${unidad}`.toLowerCase();
+                    return `<tr data-search-text="${searchText}">
+                                <td>${nombre}</td>
+                                <td>${unidad}</td>
+                                <td>${horaEntrada}</td>
+                            </tr>`;
+                }).join('');
+            } else if (category === 'empresas-adentro') {
+                headers = `<tr><th>Nombre</th><th>Empresa</th><th>Hora de Entrada</th></tr>`;
+                rows = data.map(item => {
+                    const nombre = `${item.nombre} ${item.paterno} ${item.materno || ''}`.trim();
+                    const empresa = item.empresa_nombre || 'N/A';
+                    const horaEntrada = new Date(item.entry_time).toLocaleString('es-CL');
+                    const searchText = `${nombre} ${empresa}`.toLowerCase();
+                    return `<tr data-search-text="${searchText}">
+                                <td>${nombre}</td>
+                                <td>${empresa}</td>
+                                <td>${horaEntrada}</td>
+                            </tr>`;
+                }).join('');
+            } else if (category.startsWith('personal')) {
+                headers = `<tr><th>Nombre</th><th>Móvil</th><th>Tipo</th><th>Hora de Entrada</th></tr>`;
+                rows = data.map(item => {
+                    const nombre = item.Nombres ? `${item.Grado || ''} ${item.Nombres} ${item.Paterno} ${item.Materno || ''}`.trim() : item.nombre;
+                    return `<tr data-search-text="${nombre.toLowerCase()}">
+                                <td>${nombre}</td>
+                                <td>${item.movil1 || 'N/A'}</td>
+                                <td>${item.tipo}</td>
+                                <td>${new Date(item.entry_time).toLocaleString('es-CL')}</td>
+                            </tr>`;
+                }).join('');
+            } else if (category.startsWith('visitas')) {
+                headers = `<tr><th>Nombre</th><th>Tipo</th><th>Hora de Entrada</th></tr>`;
+                rows = data.map(item => {
+                    const nombre = item.Nombres ? `${item.Grado || ''} ${item.Nombres} ${item.Paterno} ${item.Materno || ''}`.trim() : item.nombre;
+                    return `<tr data-search-text="${nombre.toLowerCase()}">
+                                <td>${nombre}</td>
+                                <td>${item.tipo}</td>
+                                <td>${new Date(item.entry_time).toLocaleString('es-CL')}</td>
+                            </tr>`;
+                }).join('');
+            } else if (category.startsWith('vehiculos')) {
+                headers = `<tr><th>Patente</th><th>Marca/Modelo</th><th>Asociado</th><th>Hora de Entrada</th></tr>`;
+                rows = data.map(item => {
+                                        const asociado = item.asociado_nombre || 'N/A';
+                    const searchText = `${item.patente} ${item.marca} ${item.modelo} ${asociado}`.toLowerCase();
+                    return `<tr data-search-text="${searchText}">
+                                <td>${item.patente}</td>
+                                <td>${item.marca || ''} ${item.modelo || ''}</td>
+                                <td>${asociado}</td>
+                                <td>${new Date(item.entry_time).toLocaleString('es-CL')}</td>
+                            </tr>`;
+                }).join('');
+            }
+
+            tableHead.innerHTML = headers;
+            tableBody.innerHTML = data.length > 0 ? rows : '<tr><td colspan="4" class="text-center">No hay registros.</td></tr>';
+
+            searchInput.value = '';
+            searchInput.addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase();
+                tableBody.querySelectorAll('tr').forEach(row => {
+                    const text = row.dataset.searchText || '';
+                    row.style.display = text.includes(query) ? '' : 'none';
+                });
+            });
+
+        } catch (error) {
+            tableBody.innerHTML = `<tr><td colspan="4" class="text-center text-danger">${error.message}</td></tr>`;
+        }
+    }
+
+    // --- MÓDULO: GESTIONAR PERSONAL ---
+    let personalModalInstance = null;
+
+    async function initPersonalModule() {
+        const modalEl = document.getElementById('personal-modal');
+        if (modalEl && !personalModalInstance) {
+            modalEl.innerHTML = getPersonalModalTemplate();
+            personalModalInstance = new bootstrap.Modal(modalEl);
+
+            const form = modalEl.querySelector('#personal-form');
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                handlePersonalFormSubmit(e, personalModalInstance);
+            });
+        }
+
+        document.getElementById('add-personal-btn').addEventListener('click', () => openPersonalModal());
+        document.getElementById('search-personal-tabla').addEventListener('input', handlePersonalTableSearch);
+        
+        // Event delegation for edit and delete buttons in personal table
+        mainContent.addEventListener('click', (e) => {
+            const editBtn = e.target.closest('.edit-personal-btn');
+            const deleteBtn = e.target.closest('.delete-personal-btn');
+
+            if (editBtn) {
+                openPersonalModal(editBtn.dataset.id);
+            } else if (deleteBtn) {
+                deletePersonal(deleteBtn.dataset.id);
+            }
+        });
+
+        try {
+            personalData = await api.getPersonal();
+            renderPersonalTable(personalData);
+        } catch (error) {
+            showToast(error.message, 'error');
+        }
+    }
+
+    function renderPersonalTable(data) {
+        const tableBody = mainContent.querySelector('#personal-table-body');
+        if (!tableBody) return;
+        tableBody.innerHTML = data.length === 0 ? '<tr><td colspan="6" class="text-center text-muted p-4">No se encontraron resultados.</td></tr>' : data.map(p => `
+            <tr>
+                <td><img src="${p.foto ? '../foto-emple/' + p.foto : 'https://via.placeholder.com/40x40.png?text=Sin+Foto'}" alt="Foto de ${p.Nombres}" class="rounded-circle" width="40" height="40" style="object-fit: cover;"></td>
+                <td>${(p.Grado || '') + ' ' + p.Nombres + ' ' + p.Paterno + ' ' + (p.Materno || '')}</td>
+                <td>${p.NrRut}</td>
+                <td>${p.Unidad || 'N/A'}</td>
+                <td><span class="badge ${p.Estado == 1 ? 'bg-success-subtle text-success-emphasis' : 'bg-danger-subtle text-danger-emphasis'}">${p.Estado == 1 ? 'Activo' : 'Inactivo'}</span></td>
+                <td>
+                    <button class="btn btn-sm btn-outline-primary edit-personal-btn" data-id="${p.id}" title="Editar"><i class="bi bi-pencil"></i></button>
+                    <button class="btn btn-sm btn-outline-danger delete-personal-btn" data-id="${p.id}" title="Eliminar"><i class="bi bi-trash"></i></button>
+                </td>
+            </tr>
+        `).join('');
+        }
+
+    function handlePersonalTableSearch(e) {
+        const query = e.target.value.toLowerCase().trim();
+        const filteredPersonal = personalData.filter(p => {
+            const nombreCompleto = `${p.Grado || ''} ${p.Nombres} ${p.Paterno} ${p.Materno || ''}`.toLowerCase();
+            const rut = (p.NrRut || '').toLowerCase().replace(/[.-]/g, '');
+            return nombreCompleto.includes(query) || rut.includes(query);
+        });
+        renderPersonalTable(filteredPersonal);
+    }
+
+    let comisionModalInstance = null;
+    let comisionData = [];
+
+    async function initComisionModule() {
+        const modalEl = document.getElementById('comision-modal');
+        if (modalEl && !comisionModalInstance) {
+            modalEl.innerHTML = getComisionModalTemplate();
+            comisionModalInstance = new bootstrap.Modal(modalEl);
+
+            const form = modalEl.querySelector('#comision-form');
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                handleComisionFormSubmit(e, comisionModalInstance);
+            });
+        }
+
+        document.getElementById('add-comision-btn').addEventListener('click', () => openComisionModal());
+        document.getElementById('search-comision-tabla').addEventListener('input', handleComisionTableSearch);
+
+        mainContent.addEventListener('click', (e) => {
+            const editBtn = e.target.closest('.edit-comision-btn');
+            const deleteBtn = e.target.closest('.delete-comision-btn');
+
+            if (editBtn) {
+                openComisionModal(editBtn.dataset.id);
+            } else if (deleteBtn) {
+                deleteComision(deleteBtn.dataset.id);
+            }
+        });
+
+        try {
+            comisionData = await api.getComision();
+            renderComisionTable(comisionData);
+        } catch (error) {
+            showToast(error.message, 'error');
+        }
+    }
+
+    function renderComisionTable(data) {
+        const tableBody = mainContent.querySelector('#comision-table-body');
+        if (!tableBody) return;
+        tableBody.innerHTML = data.length === 0 ? '<tr><td colspan="8" class="text-center text-muted p-4">No se encontraron resultados.</td></tr>' : data.map(c => `
+            <tr>
+                <td>${c.nombre_completo}</td>
+                <td>${c.rut}</td>
+                <td>${c.unidad_origen}</td>
+                <td>${c.unidad_poc}</td>
+                <td>${c.fecha_inicio}</td>
+                <td>${c.fecha_fin}</td>
+                <td><span class="badge ${c.estado === 'Activo' ? 'bg-success-subtle text-success-emphasis' : 'bg-danger-subtle text-danger-emphasis'}">${c.estado}</span></td>
+                <td>
+                    <button class="btn btn-sm btn-outline-primary edit-comision-btn" data-id="${c.id}" title="Editar"><i class="bi bi-pencil"></i></button>
+                    <button class="btn btn-sm btn-outline-danger delete-comision-btn" data-id="${c.id}" title="Eliminar"><i class="bi bi-trash"></i></button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    function handleComisionTableSearch(e) {
+        const query = e.target.value.toLowerCase().trim();
+        const filteredData = comisionData.filter(c => {
+            const nombre = (c.nombre_completo || '').toLowerCase();
+            const rut = (c.rut || '').toLowerCase();
+            const unidad = (c.unidad_origen || '').toLowerCase();
+            return nombre.includes(query) || rut.includes(query) || unidad.includes(query);
+        });
+        renderComisionTable(filteredData);
+    }
+
+    function openComisionModal(id = null) {
+        if (!comisionModalInstance) return;
+
+        const modalEl = document.getElementById('comision-modal');
+        const form = modalEl.querySelector('#comision-form');
+        const modalTitle = modalEl.querySelector('#comision-modal-title');
+
+        form.reset();
+        form.classList.remove('was-validated');
+        form.elements.id.value = '';
+
+        if (id) {
+            modalTitle.textContent = 'Editar Personal en Comisión';
+            const comision = comisionData.find(c => c.id == id);
+            if (comision) {
+                form.elements.id.value = comision.id;
+                form.elements.rut.value = comision.rut;
+                form.elements.nombre_completo.value = comision.nombre_completo;
+                form.elements.unidad_origen.value = comision.unidad_origen;
+                form.elements.unidad_poc.value = comision.unidad_poc;
+                form.elements.fecha_inicio.value = comision.fecha_inicio;
+                form.elements.fecha_fin.value = comision.fecha_fin;
+                form.elements.motivo.value = comision.motivo;
+                form.elements.poc_nombre.value = comision.poc_nombre;
+                form.elements.poc_anexo.value = comision.poc_anexo;
+            }
+        } else {
+            modalTitle.textContent = 'Agregar Personal en Comisión';
+        }
+        comisionModalInstance.show();
+    }
+
+    async function handleComisionFormSubmit(e, modal) {
+        const form = e.target;
+        if (!form.checkValidity()) {
+            e.stopPropagation();
+            form.classList.add('was-validated');
+            return;
+        }
+
+        const id = form.elements.id.value;
+        const data = {};
+        for (const element of form.elements) {
+            if (element.name) {
+                data[element.name] = element.value;
+            }
+        }
+
+        try {
+            if (id) {
+                await api.updateComision(data);
+                showToast('Registro actualizado correctamente.', 'success');
+            } else {
+                await api.createComision(data);
+                showToast('Personal en comisión agregado correctamente.', 'success');
+            }
+            modal.hide();
+            comisionData = await api.getComision();
+            renderComisionTable(comisionData);
+        } catch (error) {
+            showToast(error.message, 'error');
+        }
+    }
+
+    async function deleteComision(id) {
+        if (confirm('¿Estás seguro de que quieres eliminar este registro?')) {
+            try {
+                await api.deleteComision(id);
+                showToast('Registro eliminado correctamente.', 'success');
+                comisionData = await api.getComision();
+                renderComisionTable(comisionData);
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+    }
+
+
+    function openPersonalModal(id = null) {
+        if (!personalModalInstance) return;
+
+        const modalEl = document.getElementById('personal-modal');
+        const form = modalEl.querySelector('#personal-form');
+        const modalTitle = modalEl.querySelector('#personal-modal-title');
+
+        form.reset();
+        form.classList.remove('was-validated');
+        form.elements.id.value = '';
+
+        if (id) {
+            modalTitle.textContent = 'Editar Personal';
+            const person = personalData.find(p => p.id == id);
+            if (person) {
+                form.elements.id.value = person.id || '';
+                form.elements.Grado.value = person.Grado || '';
+                form.elements.Nombres.value = person.Nombres || '';
+                form.elements.Paterno.value = person.Paterno || '';
+                form.elements.Materno.value = person.Materno || '';
+                form.elements.NrRut.value = person.NrRut || '';
+                form.elements.fechaNacimiento.value = person.fechaNacimiento || '';
+                form.elements.sexo.value = person.sexo || '';
+                form.elements.estadoCivil.value = person.estadoCivil || '';
+                form.elements.nrEmpleado.value = person.nrEmpleado || '';
+                form.elements.puesto.value = person.puesto || '';
+                form.elements.especialidadPrimaria.value = person.especialidadPrimaria || '';
+                form.elements.fechaIngreso.value = person.fechaIngreso || '';
+                form.elements.fechaPresentacion.value = person.fechaPresentacion || '';
+                form.elements.Unidad.value = person.Unidad || '';
+                form.elements.unidadEspecifica.value = person.unidadEspecifica || '';
+                form.elements.categoria.value = person.categoria || '';
+                form.elements.escalafon.value = person.escalafon || '';
+                form.elements.trabajoExterno.value = person.trabajoExterno || '';
+                form.elements.es_residente.checked = person.es_residente == 1;
+                form.elements.calle.value = person.calle || '';
+                form.elements.numeroDepto.value = person.numeroDepto || '';
+                form.elements.poblacionVilla.value = person.poblacionVilla || '';
+                form.elements.telefonoFijo.value = person.telefonoFijo || '';
+                form.elements.movil1.value = person.movil1 || '';
+                form.elements.movil2.value = person.movil2 || '';
+                form.elements.email1.value = person.email1 || '';
+                form.elements.email2.value = person.email2 || '';
+                form.elements.anexo.value = person.anexo || '';
+                form.elements.foto.value = person.foto || '';
+                form.elements.prevision.value = person.prevision || '';
+                form.elements.sistemaSalud.value = person.sistemaSalud || '';
+                form.elements.regimenMatrimonial.value = person.regimenMatrimonial || '';
+                form.elements.religion.value = person.religion || '';
+                form.elements.tipoVivienda.value = person.tipoVivienda || '';
+                form.elements.nombreConyuge.value = person.nombreConyuge || '';
+                form.elements.profesionConyuge.value = person.profesionConyuge || '';
+                form.elements.nombreContactoEmergencia.value = person.nombreContactoEmergencia || '';
+                form.elements.direccionEmergencia.value = person.direccionEmergencia || '';
+                form.elements.movilEmergencia.value = person.movilEmergencia || '';
+                form.elements.Estado.value = person.Estado || '';
+                form.elements.fechaExpiracion.value = person.fechaExpiracion || '';
+                form.elements.accesoPermanente.checked = !!person.accesoPermanente;
+            }
+        } else {
+            modalTitle.textContent = 'Agregar Personal';
+        }
+        personalModalInstance.show();
+    }
+
+    async function handlePersonalFormSubmit(e, modal) {
+        const form = e.target;
+        if (!form.checkValidity()) {
+            e.stopPropagation();
+            form.classList.add('was-validated');
+            return;
+        }
+
+        const id = form.elements.id.value;
+        const data = {};
+        for (const element of form.elements) {
+            if (element.name) {
+                data[element.name] = element.type === 'checkbox' ? element.checked : element.value;
+            }
+        }
+
+        try {
+            if (id) {
+                await api.updatePersonal(data);
+                showToast('Personal actualizado correctamente.', 'success');
+            } else {
+                await api.createPersonal(data);
+                showToast('Personal creado correctamente.', 'success');
+            }
+            modal.hide();
+            personalData = await api.getPersonal();
+            renderPersonalTable(personalData);
+        } catch (error) {
+            showToast(error.message, 'error');
+        }
+    }
+
+    async function deletePersonal(id) {
+        if (confirm('¿Estás seguro de que quieres eliminar a esta persona?')) {
+            try {
+                await api.deletePersonal(id);
+                showToast('Personal eliminado correctamente.', 'success');
+                personalData = await api.getPersonal();
+                renderPersonalTable(personalData);
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+    }
+
+    // --- MÓDULO: CONTROL DE PERSONAL ---
+    async function initControlPersonalModule() {
+        mainContent.querySelector('#scan-personal-form').addEventListener('submit', handleScanPersonalSubmit);
+        try {
+            const logs = await api.getAccessLogs('personal');
+            renderPersonalLogTable(logs);
+        } catch (error) {
+            showToast(error.message, 'error');
+        }
+    }
+
+    async function handleScanPersonalSubmit(e) {
+        e.preventDefault();
+        const scanInput = mainContent.querySelector('#scan-personal-input');
+        const targetId = scanInput.value.trim();
+        if (!targetId) return;
+        try {
+            const result = await api.logAccess(targetId, 'personal', 'oficina');
+            showToast(result.message || 'Acceso registrado.');
+            scanInput.value = '';
+            renderPersonalScanFeedback(result, 'success');
+            initControlPersonalModule();
+        } catch (error) {
+            showToast(error.message, 'error');
+            renderPersonalScanFeedback({ message: error.message }, 'error');
+        }
+    }
+
+    function renderPersonalScanFeedback(data, type) {
+        const feedbackEl = mainContent.querySelector('#personal-scan-feedback');
+        if (!feedbackEl) return;
+        let cardHtml = '';
+        if (type === 'success') {
+            const bgColorClass = data.action === 'entrada' ? 'bg-success-subtle' : 'bg-danger-subtle';
+            const textColorClass = data.action === 'entrada' ? 'text-success-emphasis' : 'text-danger-emphasis';
+            cardHtml = `
+                <div class="card shadow-sm border-0 fade-in-out mt-4">
+                    <div class="card-body text-center p-4 rounded-3 ${bgColorClass}">
+                        <img src="${data.personalPhotoUrl ? '../foto-emple/' + data.personalPhotoUrl : 'https://via.placeholder.com/96x96.png?text=Sin+Foto'}" class="rounded-circle mx-auto mb-3" width="96" height="96" style="object-fit: cover;">
+                        <h3 class="h5 fw-bold">${data.personalName || 'Desconocido'}</h3>
+                        <p class="text-muted">RUT: ${data.personalRut || 'N/A'}</p>
+                        <p class="mt-2 fw-bold fs-4 text-uppercase ${textColorClass}">${data.action || ''}</p>
+                    </div>
+                </div>`;
+        } else {
+            cardHtml = `
+                <div class="card shadow-sm border-0 fade-in-out mt-4">
+                    <div class="card-body text-center p-4 rounded-3 bg-danger-subtle">
+                        <h3 class="h5 fw-bold text-danger">Error</h3>
+                        <p class="text-muted">${data.message || 'Ha ocurrido un error.'}</p>
+                    </div>
+                </div>`;
+        }
+        feedbackEl.innerHTML = cardHtml;
+        setTimeout(() => { feedbackEl.innerHTML = ''; }, 5000);
+    }
+
+    function renderPersonalLogTable(logs) {
+        const tableBody = mainContent.querySelector('#personal-log-table');
+        if (!tableBody) return;
+        tableBody.innerHTML = logs.length === 0 ? '<tr><td colspan="3" class="text-center text-muted p-4">No hay registros de acceso.</td></tr>' : logs.map(log => `
+            <tr>
+                <td>${log.name}</td>
+                <td><span class="badge ${log.action === 'entrada' ? 'bg-success-subtle text-success-emphasis' : 'bg-danger-subtle text-danger-emphasis'}">${log.action}</span></td>
+                <td>${log.timestamp}</td>
+            </tr>
+        `).join('');
+    }
+
+    // --- MÓDULO: GESTIONAR VEHÍCULOS ---
+    let vehiculoModalInstance = null;
+
+    async function initVehiculoModule() {
+        const modalEl = document.getElementById('vehiculo-modal');
+        if (modalEl && !vehiculoModalInstance) {
+            modalEl.innerHTML = getVehiculoModalTemplate();
+            vehiculoModalInstance = new bootstrap.Modal(modalEl);
+
+            const form = modalEl.querySelector('#vehiculo-form');
+
+            // --- VALIDACIÓN DE PATENTE CHILENA ---
+            const patenteInput = form.querySelector('#patente');
+            const patenteValidationMessage = form.querySelector('#patente-validation-message');
+            
+            // Función para validar patente chilena
+            function validarPatenteChilena(patente) {
+                // Formato antiguo: dos letras y cuatro dígitos (AA1234)
+                const formatoAntiguo = /^[A-Z]{2}[0-9]{4}$/;
+                
+                // Formato nuevo: cuatro letras y dos dígitos (BCDF12)
+                const formatoNuevo = /^[B-DF-HJ-NP-TV-Z]{4}[0-9]{2}$/;
+                
+                // Formato de motos nuevo: tres letras y dos números (ABC12)
+                const formatoMotoNuevo = /^[B-DF-HJ-NP-TV-Z]{3}[0-9]{2}$/;
+
+                // Formato de motos antiguo: dos letras y tres números (AB123)
+                const formatoMotoAntiguo = /^[A-Z]{2}[0-9]{3}$/;
+
+                // Formato de remolques: tres letras y tres números (ABC123)
+                const formatoRemolque = /^[A-Z]{3}[0-9]{3}$/;
+                
+                return formatoAntiguo.test(patente) || 
+                       formatoNuevo.test(patente) || 
+                       formatoMotoNuevo.test(patente) ||
+                       formatoMotoAntiguo.test(patente) ||
+                       formatoRemolque.test(patente);
+            }
+            
+            patenteInput.addEventListener('input', function(e) {
+                // Convertir automáticamente a mayúsculas
+                this.value = this.value.toUpperCase();
+                
+                // Validar formato
+                const patente = this.value.trim();
+                const esValida = validarPatenteChilena(patente);
+                
+                // Feedback visual
+                if (patente && !esValida) {
+                    this.classList.add('is-invalid');
+                    this.classList.remove('is-valid');
+                    
+                    // Determinar el mensaje de error específico
+                    if (patente.length < 5 || patente.length > 6) {
+                        patenteValidationMessage.textContent = 'La patente debe tener 5 o 6 caracteres';
+                    } else if (/[^A-Za-z0-9]/.test(patente)) {
+                        patenteValidationMessage.textContent = 'La patente solo puede contener letras y números';
+                    } else {
+                        patenteValidationMessage.textContent = 'Formato inválido. Formatos válidos: AA1234, BCDF12, BCD12, AB123, ABC123';
+                    }
+                } else if (patente) {
+                    this.classList.add('is-valid');
+                    this.classList.remove('is-invalid');
+                } else {
+                    this.classList.remove('is-valid', 'is-invalid');
+                }
+            });
+
+            // --- LÓGICA PARA LA BÚSQUEDA DE PERSONAL ---
+const searchBtn = form.querySelector('#search-personal-btn');
+const personalRutInput = form.querySelector('#personalRut');
+const nombreAsociadoDisplay = form.querySelector('#vehiculo-nombre-asociado');
+const searchResultsContainer = form.querySelector('#personal-search-results');
+
+window.selectedPersonalId = null; // Variable para almacenar el ID del personal seleccionado
+let debounceTimer;
+
+// Función para buscar personal
+// Función para manejar el cambio de tipo de acceso
+window.handleTipoAccesoChange = (selectedType) => {
+    const personalRutInput = document.getElementById('personalRut');
+    const nombreAsociadoDisplay = document.getElementById('vehiculo-nombre-asociado');
+    const searchBtn = document.getElementById('search-personal-btn');
+    
+    // Limpiar búsqueda actual
+    personalRutInput.value = '';
+    nombreAsociadoDisplay.textContent = '';
+    window.selectedPersonalId = null;
+    
+    // Actualizar placeholder según el tipo seleccionado
+    switch(selectedType) {
+        case 'FISCAL':
+        case 'FUNCIONARIO':
+            personalRutInput.placeholder = 'Buscar personal militar o civil';
+            nombreAsociadoDisplay.textContent = 'Ingrese RUT o nombre del funcionario';
+            break;
+        case 'RESIDENTE':
+            personalRutInput.placeholder = 'Buscar residente';
+            nombreAsociadoDisplay.textContent = 'Ingrese RUT o nombre del residente';
+            break;
+        case 'VISITA':
+            personalRutInput.placeholder = 'Buscar visita';
+            nombreAsociadoDisplay.textContent = 'Ingrese RUT o nombre del visitante';
+            break;
+        case 'EMPRESA':
+            personalRutInput.placeholder = 'Buscar personal de empresa';
+            nombreAsociadoDisplay.textContent = 'Ingrese RUT o nombre del empleado';
+            break;
+    }
+};
+
+const searchPersonal = async (query) => {
+    if (!query || query.length < 3) {
+        searchResultsContainer.style.display = 'none';
+        return;
+    }
+    
+    nombreAsociadoDisplay.textContent = 'Buscando...';
+    nombreAsociadoDisplay.className = 'form-text text-muted mt-1 d-block';
+    
+    try {
+        // Obtener el tipo de acceso seleccionado
+        const tipoAcceso = document.getElementById('tipo').value;
+        const results = await api.searchPersonal(query, tipoAcceso);
+        
+        if (!results || results.length === 0) {
+            nombreAsociadoDisplay.textContent = 'No se encontraron resultados.';
+            nombreAsociadoDisplay.className = 'form-text text-danger mt-1 d-block';
+            searchResultsContainer.style.display = 'none';
+            return;
+        }
+        
+        // Mostrar resultados
+        searchResultsContainer.innerHTML = results.map(persona => {
+            const nombreCompleto = `${persona.Grado || ''} ${persona.Nombres || ''} ${persona.Paterno || ''} ${persona.Materno || ''}`.trim();
+            return `
+                <button type="button" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center personal-result" 
+                        data-id="${persona.id}" data-rut="${persona.NrRut}">
+                    <div>
+                        <strong>${nombreCompleto}</strong>
+                        <small class="d-block text-muted">RUT: ${persona.NrRut}</small>
+                    </div>
+                    <small class="text-muted">${persona.Unidad || ''}</small>
+                </button>
+            `;
+        }).join('');
+        
+        searchResultsContainer.style.display = 'block';
+        
+        // Añadir event listeners a los resultados
+        searchResultsContainer.querySelectorAll('.personal-result').forEach(item => {
+            item.addEventListener('click', (e) => {
+                const personalId = e.currentTarget.dataset.id;
+                const rut = e.currentTarget.dataset.rut;
+                const nombre = e.currentTarget.querySelector('strong').textContent;
+                
+                // Guardar el ID del personal seleccionado
+                window.selectedPersonalId = personalId;
+                
+                // Actualizar el input y el display
+                personalRutInput.value = rut;
+                nombreAsociadoDisplay.textContent = `Seleccionado: ${nombre}`;
+                nombreAsociadoDisplay.className = 'form-text text-success mt-1 d-block';
+                personalRutInput.classList.add('is-valid');
+                personalRutInput.classList.remove('is-invalid');
+                
+                // Ocultar los resultados
+                searchResultsContainer.style.display = 'none';
+            });
+        });
+        
+        nombreAsociadoDisplay.textContent = `${results.length} resultados encontrados`;
+        nombreAsociadoDisplay.className = 'form-text text-muted mt-1 d-block';
+        
+    } catch (error) {
+        console.error("Error en búsqueda de personal:", error);
+        nombreAsociadoDisplay.textContent = 'Error al buscar personal.';
+        nombreAsociadoDisplay.className = 'form-text text-danger mt-1 d-block';
+        searchResultsContainer.style.display = 'none';
+    }
+};
+
+// Event listener para el botón de búsqueda
+searchBtn.addEventListener('click', () => {
+    const query = personalRutInput.value.trim();
+    if (query) {
+        searchPersonal(query);
+    }
+});
+
+// Event listener para la tecla Enter en el input
+personalRutInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        e.preventDefault(); // Prevenir envío de formulario
+        const query = personalRutInput.value.trim();
+        if (query) {
+            searchPersonal(query);
+        }
+    }
+});
+
+// Busqueda automática mientras escribe (con debounce)
+personalRutInput.addEventListener('input', (e) => {
+    const query = e.target.value.trim();
+    
+    // Limpiar el timer anterior
+    clearTimeout(debounceTimer);
+    
+    // Si se borró el contenido, limpiar todo
+    if (!query) {
+        nombreAsociadoDisplay.textContent = '';
+        searchResultsContainer.style.display = 'none';
+        selectedPersonalId = null;
+        personalRutInput.classList.remove('is-valid', 'is-invalid');
+        return;
+    }
+    
+    // Configurar un nuevo timer
+    debounceTimer = setTimeout(() => {
+        if (query.length >= 3) {
+            searchPersonal(query);
+        }
+    }, 500); // Esperar 500ms después de que el usuario deje de escribir
+});
+
+// Cerrar resultados al hacer clic fuera
+document.addEventListener('click', (e) => {
+    if (searchResultsContainer.style.display === 'block' && 
+        !searchResultsContainer.contains(e.target) && 
+        e.target !== personalRutInput &&
+        e.target !== searchBtn) {
+        searchResultsContainer.style.display = 'none';
+    }
+});
+// --- FIN DE LA LÓGICA DE BÚSQUEDA DE PERSONAL ---
+
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                handleVehiculoFormSubmit(e, vehiculoModalInstance);
+            });
+
+            const accesoPermanenteCheckbox = form.querySelector('#acceso_permanente');
+            const fechaExpiracionInput = form.querySelector('#fecha_expiracion');
+            // Función para actualizar el estado del campo fecha_expiracion
+            const actualizarFechaExpiracion = () => {
+                fechaExpiracionInput.disabled = accesoPermanenteCheckbox.checked;
+                if (accesoPermanenteCheckbox.checked) {
+                    fechaExpiracionInput.value = '';
+                }
+            };
+            // Aplicar el estado inicial
+            actualizarFechaExpiracion();
+            // Añadir el evento para cambios futuros
+            accesoPermanenteCheckbox.addEventListener('change', actualizarFechaExpiracion);
+        }
+
+        document.getElementById('add-vehiculo-btn').addEventListener('click', () => openVehiculoModal());
+        document.getElementById('search-vehiculo-tabla').addEventListener('input', handleVehiculoTableSearch);
+        document.getElementById('import-vehiculos-btn').addEventListener('click', openImportVehiculosModal);
+        
+        // Configuración de filtros avanzados
+        const toggleAdvancedSearchBtn = document.getElementById('toggle-advanced-search');
+        const advancedSearchFilters = document.getElementById('advanced-search-filters');
+        const applyFiltersBtn = document.getElementById('apply-advanced-filters');
+        const resetFiltersBtn = document.getElementById('reset-advanced-filters');
+        const advancedFilterInputs = document.querySelectorAll('.advanced-filter');
+        
+        // Mostrar/ocultar filtros avanzados
+        toggleAdvancedSearchBtn.addEventListener('click', () => {
+            const isVisible = advancedSearchFilters.style.display !== 'none';
+            advancedSearchFilters.style.display = isVisible ? 'none' : 'block';
+            toggleAdvancedSearchBtn.innerHTML = isVisible ? 
+                '<i class="bi bi-funnel"></i> Filtros Avanzados' : 
+                '<i class="bi bi-funnel-fill"></i> Ocultar Filtros';
+        });
+        
+        // Aplicar filtros avanzados
+        applyFiltersBtn.addEventListener('click', () => {
+            applyFilters();
+        });
+        
+        // Resetear filtros avanzados
+        resetFiltersBtn.addEventListener('click', () => {
+            // Limpiar todos los campos de filtro
+            advancedFilterInputs.forEach(input => {
+                if (input.tagName === 'SELECT') {
+                    input.selectedIndex = 0;
+                } else {
+                    input.value = '';
+                }
+            });
+            
+            // Aplicar filtros (sin filtros = mostrar todos)
+            applyFilters();
+        });
+        
+        // Permitir aplicar filtros avanzados con Enter en cualquier campo de filtro
+        advancedFilterInputs.forEach(input => {
+            input.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    applyFilters();
+                }
+            });
+        });
+        
+        // Event delegation for edit, delete, QR, and history buttons in vehiculo table
+        mainContent.addEventListener('click', (e) => {
+            const editBtn = e.target.closest('.edit-vehiculo-btn');
+            const deleteBtn = e.target.closest('.delete-vehiculo-btn');
+            const qrBtn = e.target.closest('.generate-qr-btn');
+            const historialBtn = e.target.closest('.historial-vehiculo-btn');
+
+            if (editBtn) {
+                openVehiculoModal(editBtn.dataset.id);
+            } else if (deleteBtn) {
+                deleteVehiculo(deleteBtn.dataset.id);
+            } else if (qrBtn) {
+                generateAndShowQrCode(qrBtn.dataset.patente, qrBtn.dataset.id);
+            } else if (historialBtn) {
+                showVehiculoHistorial(historialBtn.dataset.id, historialBtn.dataset.patente);
+            }
+        });
+
+        try {
+            // Cargar los datos de vehículos y personal
+            [vehiculosData, personalData] = await Promise.all([api.getVehiculos(), api.getPersonal()]);
+            renderVehiculoTable(vehiculosData);
+        } catch (error) {
+            showToast(error.message, 'error');
+            
+            // Mostrar mensaje de diagnóstico más detallado
+            console.error("Error en initVehiculoModule:", error);
+            
+            // Mensaje de error más descriptivo para el usuario
+            document.getElementById('vehiculo-table-body').innerHTML = `
+                <tr>
+                    <td colspan="9" class="text-center text-danger p-4">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                        Error al cargar datos de vehículos. Detalles: ${error.message}
+                    </td>
+                </tr>
+            `;
+        }
+    }
+
+    function renderVehiculoTable(data) {
+        const tableBody = mainContent.querySelector('#vehiculo-table-body');
+        if (!tableBody) return;
+        tableBody.innerHTML = data.length === 0 ? '<tr><td colspan="9" class="text-center text-muted p-4">No se encontraron resultados.</td></tr>' : data.map(v => {
+            // Usar directamente el nombre del asociado que viene del backend
+            const asociadoNombre = v.asociado_nombre || 'N/A';
+            return `
+                <tr>
+                    <td>${v.patente}</td>
+                    <td>${v.marca || 'N/A'}</td>
+                    <td>${asociadoNombre}</td>
+                    <td>${v.tipo || 'N/A'}</td>
+                    <td><span class="badge ${v.status === 'autorizado' ? 'bg-success-subtle text-success-emphasis' : 'bg-warning-subtle text-warning-emphasis'}">${v.status}</span></td>
+                    <td>${v.acceso_permanente ? 'N/A' : (v.fecha_expiracion || 'Sin fecha')}</td>
+                    <td><span class="badge ${v.acceso_permanente ? 'bg-primary-subtle text-primary-emphasis' : 'bg-secondary-subtle text-secondary-emphasis'}">${v.acceso_permanente ? 'Sí' : 'No'}</span></td>
+                    <td class="text-center"><button class="btn btn-sm btn-outline-info generate-qr-btn" data-patente="${v.patente}" data-id="${v.id}" title="Generar QR"><i class="bi bi-qr-code"></i></button></td>
+                    <td>
+                        <div class="btn-group" role="group">
+                            <button class="btn btn-sm btn-outline-primary edit-vehiculo-btn" data-id="${v.id}" title="Editar"><i class="bi bi-pencil"></i></button>
+                            <button class="btn btn-sm btn-outline-secondary historial-vehiculo-btn" data-id="${v.id}" data-patente="${v.patente}" title="Ver Historial"><i class="bi bi-clock-history"></i></button>
+                            <button class="btn btn-sm btn-outline-danger delete-vehiculo-btn" data-id="${v.id}" title="Eliminar"><i class="bi bi-trash"></i></button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+        
+    }
+
+    function handleVehiculoTableSearch(e) {
+        // Para búsqueda rápida (simple), aplicamos el filtro inmediatamente
+        const query = e.target.value.toLowerCase().trim();
+        applyFilters(query);
+    }
+    
+    // Función unificada para aplicar todos los filtros
+    function applyFilters(quickSearchQuery = '') {
+        // Obtener valores de filtros avanzados
+        const filterPatente = document.getElementById('filter-patente')?.value.toLowerCase().trim() || '';
+        const filterMarca = document.getElementById('filter-marca')?.value.toLowerCase().trim() || '';
+        const filterModelo = document.getElementById('filter-modelo')?.value.toLowerCase().trim() || '';
+        const filterTipo = document.getElementById('filter-tipo')?.value || '';
+        const filterStatus = document.getElementById('filter-status')?.value || '';
+        const filterPermanente = document.getElementById('filter-permanente')?.value || '';
+        const filterAsociado = document.getElementById('filter-asociado')?.value.toLowerCase().trim() || '';
+        
+        // Determinar si estamos en modo de búsqueda rápida o filtros avanzados
+        const isAdvancedSearch = document.getElementById('advanced-search-filters')?.style.display !== 'none';
+        
+        const filteredVehiculos = vehiculosData.filter(v => {
+            // Obtener información del asociado
+            const asociadoNombre = v.asociado_nombre ? v.asociado_nombre.toLowerCase() : '';
+            const rutAsociado = v.rut_asociado ? v.rut_asociado.toLowerCase().replace(/[.-]/g, '') : '';
+            
+            // Si estamos en búsqueda rápida, aplicamos la búsqueda general
+            if (!isAdvancedSearch && quickSearchQuery) {
+                return (
+                    (v.patente || '').toLowerCase().includes(quickSearchQuery) || 
+                    (v.marca || '').toLowerCase().includes(quickSearchQuery) || 
+                    (v.modelo || '').toLowerCase().includes(quickSearchQuery) || 
+                    asociadoNombre.includes(quickSearchQuery) ||
+                    rutAsociado.includes(quickSearchQuery) ||
+                    (v.tipo || '').toLowerCase().includes(quickSearchQuery)
+                );
+            }
+            
+            // Si estamos en filtros avanzados, aplicamos todos los filtros activos
+            let matchesFilters = true;
+            
+            // Filtrar por patente
+            if (filterPatente && !(v.patente || '').toLowerCase().includes(filterPatente)) {
+                matchesFilters = false;
+            }
+            
+            // Filtrar por marca
+            if (filterMarca && !(v.marca || '').toLowerCase().includes(filterMarca)) {
+                matchesFilters = false;
+            }
+            
+            // Filtrar por modelo
+            if (filterModelo && !(v.modelo || '').toLowerCase().includes(filterModelo)) {
+                matchesFilters = false;
+            }
+            
+            // Filtrar por tipo
+            if (filterTipo && (v.tipo || '') !== filterTipo) {
+                matchesFilters = false;
+            }
+            
+            // Filtrar por estado de autorización
+            if (filterStatus && (v.status || '') !== filterStatus) {
+                matchesFilters = false;
+            }
+            
+            // Filtrar por acceso permanente
+            if (filterPermanente) {
+                const isPermanente = v.acceso_permanente ? '1' : '0';
+                if (isPermanente !== filterPermanente) {
+                    matchesFilters = false;
+                }
+            }
+            
+            // Filtrar por asociado (nombre o rut)
+            if (filterAsociado && !asociadoNombre.includes(filterAsociado) && !rutAsociado.includes(filterAsociado)) {
+                matchesFilters = false;
+            }
+            
+            return matchesFilters;
+        });
+        
+        renderVehiculoTable(filteredVehiculos);
+    }
+
+    // Función para abrir el modal de importación de vehículos
+    function openImportVehiculosModal() {
+        // Crear el modal si no existe
+        let importModalEl = document.getElementById('import-vehiculos-modal');
+        if (!importModalEl) {
+            importModalEl = document.createElement('div');
+            importModalEl.id = 'import-vehiculos-modal';
+            importModalEl.className = 'modal fade';
+            importModalEl.tabIndex = '-1';
+            document.body.appendChild(importModalEl);
+        }
+        
+        // Establecer el contenido y inicializar
+        importModalEl.innerHTML = getImportVehiculosModalTemplate();
+        const importModal = new bootstrap.Modal(importModalEl);
+        
+        // Resetear el contenido del modal
+        const resetModalContent = () => {
+            document.getElementById('vehiculos-csv-file').value = '';
+            document.getElementById('import-progress-container').classList.add('d-none');
+            document.getElementById('import-progress-bar').style.width = '0%';
+            document.getElementById('import-results').classList.add('d-none');
+            document.getElementById('start-import-btn').disabled = false;
+        };
+
+        // Event listener para el botón de iniciar importación
+        document.getElementById('start-import-btn').addEventListener('click', () => {
+            handleImportVehiculos();
+        });
+
+        // Mostrar el modal
+        importModal.show();
+        
+        // Resetear cuando se oculta
+        importModalEl.addEventListener('hidden.bs.modal', resetModalContent);
+    }
+    
+    // Función para manejar la importación de vehículos
+    async function handleImportVehiculos() {
+        const fileInput = document.getElementById('vehiculos-excel-file');
+        const file = fileInput.files[0];
+        
+        // Validar que hay un archivo seleccionado
+        if (!file) {
+            showToast('Por favor, seleccione un archivo para importar', 'warning');
+            return;
+        }
+        
+        // Identificar el tipo de archivo
+        const isExcel = file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || 
+                        file.type === 'application/vnd.ms-excel' ||
+                        file.name.endsWith('.xlsx') || 
+                        file.name.endsWith('.xls');
+        
+        const isCsv = file.type === 'text/csv' || 
+                     file.name.endsWith('.csv');
+                        
+        if (!isExcel && !isCsv) {
+            showToast('El archivo debe ser de tipo Excel (.xlsx, .xls) o CSV (.csv)', 'warning');
+            return;
+        }
+        
+        // Mostrar progreso y deshabilitar botón
+        document.getElementById('start-import-btn').disabled = true;
+        document.getElementById('import-progress-container').classList.remove('d-none');
+        document.getElementById('import-results').classList.add('d-none');
+        document.getElementById('import-status').textContent = 'Procesando archivo...';
+        
+        try {
+            let vehiculosData;
+            
+            // Determinar cómo procesar el archivo según su tipo
+            const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
+            
+            if (isExcel) {
+                // Para archivos Excel
+                // Verificar si la biblioteca xlsx está disponible
+                if (typeof XLSX === 'undefined') {
+                    // Cargar la biblioteca xlsx.js dinámicamente si no está disponible
+                    await loadExcelLibrary();
+                }
+                
+                // Leer el archivo Excel
+                vehiculosData = await readExcelFile(file);
+                
+                // Validar la estructura del archivo
+                if (!validateExcelStructure(vehiculosData)) {
+                    showToast('El archivo Excel no tiene la estructura correcta', 'error');
+                    document.getElementById('import-status').textContent = 'Error: El archivo Excel no tiene la estructura correcta.';
+                    return;
+                }
+            } else {
+                // Para archivos CSV
+                vehiculosData = await readCSVFile(file);
+                
+                // Validar la estructura del archivo
+                if (!validateCSVStructure(vehiculosData)) {
+                    showToast('El archivo CSV no tiene la estructura correcta', 'error');
+                    document.getElementById('import-status').textContent = 'Error: El archivo CSV no tiene la estructura correcta.';
+                    return;
+                }
+            }
+            
+            // Iniciar el proceso de importación
+            await processVehiculosImport(vehiculosData);
+            
+        } catch (error) {
+            console.error('Error en la importación de vehículos:', error);
+            showToast('Error en la importación: ' + error.message, 'error');
+            document.getElementById('import-status').textContent = 'Error durante la importación: ' + error.message;
+        }
+    }
+    
+    // Función para cargar dinámicamente la biblioteca xlsx.js
+    function loadExcelLibrary() {
+        return new Promise((resolve, reject) => {
+            if (typeof XLSX !== 'undefined') {
+                resolve();
+                return;
+            }
+            
+            console.log('Cargando biblioteca SheetJS para procesar Excel...');
+            const script = document.createElement('script');
+            script.src = 'js/xlsx.full.min.js';
+            script.onload = () => {
+                console.log('Biblioteca SheetJS cargada correctamente');
+                resolve();
+            };
+            script.onerror = () => {
+                console.error('Error al cargar la biblioteca SheetJS');
+                reject(new Error('No se pudo cargar la biblioteca para procesar archivos Excel. Por favor, intente nuevamente o contacte al administrador.'));
+            };
+            document.head.appendChild(script);
+        });
+    }
+    
+    // Función para leer el archivo Excel
+    function readExcelFile(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            
+            reader.onload = (event) => {
+                try {
+                    // Leer el archivo Excel con la biblioteca SheetJS
+                    const data = new Uint8Array(event.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    
+                    // Obtener la primera hoja
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    
+                    // Convertir a JSON
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet, { raw: false });
+                    
+                    // Verificar los campos requeridos
+                    const requiredFields = ['patente', 'marca', 'modelo', 'tipo', 'personalNrRut', 'acceso_permanente', 'fecha_expiracion'];
+                    
+                    if (jsonData.length === 0) {
+                        reject(new Error('El archivo Excel está vacío o no tiene datos válidos'));
+                        return;
+                    }
+                    
+                    // Verificar que todos los campos requeridos están presentes
+                    const firstRow = jsonData[0];
+                    const missingFields = requiredFields.filter(field => !(field in firstRow));
+                    if (missingFields.length > 0) {
+                        reject(new Error(`Faltan columnas requeridas: ${missingFields.join(', ')}`));
+                        return;
+                    }
+                    
+                    resolve(jsonData);
+                    
+                } catch (error) {
+                    reject(new Error('Error al procesar el archivo Excel: ' + error.message));
+                }
+            };
+            
+            reader.onerror = () => {
+                reject(new Error('Error al leer el archivo'));
+            };
+            
+            reader.readAsArrayBuffer(file);
+        });
+    }
+    
+    // Función para validar la estructura del Excel
+    function validateExcelStructure(vehiculosData) {
+        // Si no hay datos, no es válido
+        if (!vehiculosData || vehiculosData.length === 0) {
+            return false;
+        }
+        
+        // Verificar que todos los registros tienen los campos necesarios
+        const requiredFields = ['patente', 'marca', 'modelo', 'tipo', 'personalNrRut', 'acceso_permanente'];
+        
+        for (const vehiculo of vehiculosData) {
+            for (const field of requiredFields) {
+                if (!(field in vehiculo)) {
+                    return false;
+                }
+            }
+        }
+        
+        return true;
+    }
+    
+    // Función para leer el archivo CSV
+    function readCSVFile(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            
+            reader.onload = (event) => {
+                try {
+                    const csv = event.target.result;
+                    const lines = csv.split('\\n');
+                    const headers = lines[0].split(',').map(header => header.trim());
+                    
+                    const requiredFields = ['patente', 'marca', 'modelo', 'tipo', 'personalNrRut', 'acceso_permanente', 'fecha_expiracion'];
+                    
+                    // Verificar que todos los campos requeridos están presentes
+                    const missingFields = requiredFields.filter(field => !headers.includes(field));
+                    if (missingFields.length > 0) {
+                        reject(new Error(`Faltan columnas requeridas: ${missingFields.join(', ')}`));
+                        return;
+                    }
+                    
+                    const vehiculos = [];
+                    
+                    // Procesar cada línea del CSV
+                    for (let i = 1; i < lines.length; i++) {
+                        if (!lines[i].trim()) continue; // Saltar líneas vacías
+                        
+                        const values = lines[i].split(',').map(value => value.trim());
+                        
+                        // Si el número de valores no coincide con el número de columnas, saltamos
+                        if (values.length !== headers.length) continue;
+                        
+                        const vehiculo = {};
+                        headers.forEach((header, index) => {
+                            vehiculo[header] = values[index];
+                        });
+                        
+                        vehiculos.push(vehiculo);
+                    }
+                    
+                    resolve(vehiculos);
+                    
+                } catch (error) {
+                    reject(new Error('Error al procesar el archivo CSV: ' + error.message));
+                }
+            };
+            
+            reader.onerror = () => {
+                reject(new Error('Error al leer el archivo'));
+            };
+            
+            reader.readAsText(file);
+        });
+    }
+    
+    // Función para validar la estructura del CSV
+    function validateCSVStructure(vehiculosData) {
+        return validateExcelStructure(vehiculosData); // Usa la misma lógica de validación
+    }
+    
+    // Función para procesar la importación de vehículos
+    async function processVehiculosImport(vehiculosData) {
+        const totalCount = vehiculosData.length;
+        let successCount = 0;
+        let errorCount = 0;
+        const errors = [];
+        
+        // Configurar la barra de progreso
+        const progressBar = document.getElementById('import-progress-bar');
+        const statusText = document.getElementById('import-status');
+        
+        // Procesar cada vehículo
+        for (let i = 0; i < totalCount; i++) {
+            const vehiculo = vehiculosData[i];
+            
+            try {
+                // Actualizar progreso
+                const progress = Math.round(((i + 1) / totalCount) * 100);
+                progressBar.style.width = progress + '%';
+                progressBar.setAttribute('aria-valuenow', progress);
+                statusText.textContent = `Procesando ${i + 1} de ${totalCount}...`;
+                
+                // Validar la patente (formato chileno)
+                const patente = vehiculo.patente.toUpperCase();
+                if (!validarPatenteChilena(patente)) {
+                    throw new Error(`Formato de patente inválido: ${patente}`);
+                }
+                
+                // Preparar el objeto para enviar al API
+                const vehiculoData = {
+                    patente: patente,
+                    marca: vehiculo.marca,
+                    modelo: vehiculo.modelo,
+                    tipo: vehiculo.tipo.toUpperCase(),
+                    personalNrRut: vehiculo.personalNrRut || null,
+                    acceso_permanente: vehiculo.acceso_permanente === '1' || vehiculo.acceso_permanente.toLowerCase() === 'true',
+                    fecha_expiracion: vehiculo.acceso_permanente === '1' ? null : vehiculo.fecha_expiracion || null
+                };
+                
+                // Enviar al API
+                await api.createVehiculo(vehiculoData);
+                successCount++;
+                
+            } catch (error) {
+                console.error(`Error al procesar vehículo ${i + 1}:`, error);
+                errorCount++;
+                errors.push(`Fila ${i + 1} - Patente ${vehiculo.patente}: ${error.message}`);
+            }
+            
+            // Esperar un poco entre solicitudes para no sobrecargar el servidor
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        
+        // Mostrar resultados finales
+        document.getElementById('import-results').classList.remove('d-none');
+        document.getElementById('import-total-count').textContent = totalCount;
+        document.getElementById('import-success-count').textContent = successCount;
+        document.getElementById('import-error-count').textContent = errorCount;
+        
+        // Mostrar errores si los hay
+        if (errors.length > 0) {
+            document.getElementById('import-errors-container').classList.remove('d-none');
+            document.getElementById('import-errors-list').innerHTML = errors.map(error => 
+                `<div class="text-danger small mb-1">${error}</div>`
+            ).join('');
+        } else {
+            document.getElementById('import-errors-container').classList.add('d-none');
+        }
+        
+        // Actualizar la tabla de vehículos si hubo éxito
+        if (successCount > 0) {
+            try {
+                vehiculosData = await api.getVehiculos();
+                renderVehiculoTable(vehiculosData);
+            } catch (error) {
+                console.error("Error al actualizar la tabla de vehículos:", error);
+            }
+        }
+        
+        // Mensaje de finalización
+        statusText.textContent = `Importación finalizada. ${successCount} vehículos importados con éxito.`;
+        
+        // Notificación
+        if (errorCount === 0) {
+            showToast(`Importación completada. ${successCount} vehículos importados.`, 'success');
+        } else {
+            showToast(`Importación completada con ${errorCount} errores. ${successCount} vehículos importados.`, 'warning');
+        }
+    }
+    
+    function bindVehiculoTableEvents() {
+        mainContent.querySelectorAll('.edit-vehiculo-btn').forEach(btn => btn.addEventListener('click', (e) => openVehiculoModal(e.currentTarget.dataset.id)));
+        mainContent.querySelectorAll('.delete-vehiculo-btn').forEach(btn => btn.addEventListener('click', (e) => deleteVehiculo(e.currentTarget.dataset.id)));
+        mainContent.querySelectorAll('.generate-qr-btn').forEach(btn => btn.addEventListener('click', (e) => generateAndShowQrCode(e.currentTarget.dataset.patente, e.currentTarget.dataset.id)));
+    }
+
+    function openVehiculoModal(id = null) {
+        if (!vehiculoModalInstance) return;
+
+        const modalEl = document.getElementById('vehiculo-modal');
+        const form = modalEl.querySelector('#vehiculo-form');
+        const modalTitle = modalEl.querySelector('#vehiculo-modal-title');
+        const nombreDisplay = form.querySelector('#vehiculo-nombre-asociado');
+        const personalRutInput = form.querySelector('#personalRut');
+        const searchResults = form.querySelector('#personal-search-results');
+
+        // 1. Limpiar estado anterior
+        form.reset();
+        form.classList.remove('was-validated');
+        form.elements.id.value = '';
+        window.selectedPersonalId = null; // Limpia el ID global al abrir
+        nombreDisplay.textContent = 'Ingrese RUT o nombre para buscar';
+        personalRutInput.classList.remove('is-valid', 'is-invalid');
+        searchResults.style.display = 'none';
+
+        if (id) {
+            modalTitle.textContent = 'Editar Vehículo';
+            const vehiculo = vehiculosData.find(v => v.id == id);
+            if (vehiculo) {
+                // Llenar todos los campos del formulario
+                form.elements.id.value = vehiculo.id;
+                form.elements.patente.value = vehiculo.patente || '';
+                form.elements.marca.value = vehiculo.marca || '';
+                form.elements.modelo.value = vehiculo.modelo || '';
+                form.elements.tipo.value = vehiculo.tipo || 'FUNCIONARIO';
+                form.elements.tipo_vehiculo.value = vehiculo.tipo_vehiculo || 'AUTO';
+                form.elements.fecha_inicio.value = vehiculo.fecha_inicio || '';
+                form.elements.fecha_expiracion.value = vehiculo.fecha_expiracion || '';
+                form.elements.acceso_permanente.checked = !!vehiculo.acceso_permanente;
+
+                // 2. Cargar datos del asociado existente
+                if (vehiculo.asociado_id) {
+                    window.selectedPersonalId = vehiculo.asociado_id; // Carga el ID existente
+                    personalRutInput.value = vehiculo.rut_asociado || '';
+                    nombreDisplay.textContent = `Asociado actual: ${vehiculo.asociado_nombre}`;
+                    nombreDisplay.className = 'form-text text-success mt-1 d-block';
+                }
+            }
+        } else {
+            modalTitle.textContent = 'Agregar Vehículo';
+        }
+
+        // 3. Simular un cambio para asegurar que la UI del placeholder esté correcta
+        window.handleTipoAccesoChange(form.elements.tipo.value);
+
+        // Actualizar estado del campo fecha_expiracion
+        form.querySelector('#acceso_permanente').dispatchEvent(new Event('change'));
+
+        vehiculoModalInstance.show();
+    }
+
+    async function handleVehiculoFormSubmit(e, modal) {
+        const form = e.target;
+        const patenteInput = form.querySelector('#patente');
+        const patente = patenteInput.value.trim().toUpperCase();
+        
+        // Validación de formato de patente (debe coincidir con la validación del backend)
+        const formatoAntiguo = /^[A-Z]{2}[0-9]{4}$/;
+        const formatoNuevo = /^[B-DF-HJ-NP-TV-Z]{4}[0-9]{2}$/;
+        const formatoMotoNuevo = /^[B-DF-HJ-NP-TV-Z]{3}[0-9]{2}$/;
+        const formatoMotoAntiguo = /^[A-Z]{2}[0-9]{3}$/;
+        const formatoRemolque = /^[A-Z]{3}[0-9]{3}$/;
+        
+        const patenteValida = formatoAntiguo.test(patente) || 
+                             formatoNuevo.test(patente) || 
+                             formatoMotoNuevo.test(patente) ||
+                             formatoMotoAntiguo.test(patente) ||
+                             formatoRemolque.test(patente);
+                             
+        if (!patenteValida) {
+            patenteInput.classList.add('is-invalid');
+            e.stopPropagation();
+            form.classList.add('was-validated');
+            return;
+        }
+        
+        // Conversión final a mayúsculas
+        patenteInput.value = patente;
+        
+        if (!form.checkValidity()) {
+            e.stopPropagation();
+            form.classList.add('was-validated');
+            return;
+        }
+
+        const id = form.elements.id.value;
+        const data = {};
+        
+        // Recopilar datos del formulario
+        for (const element of form.elements) {
+            if (element.name) {
+                if (element.type === 'checkbox') {
+                    data[element.name] = element.checked ? 1 : 0;
+                } else if (element.type === 'date' || element.name === 'fecha_inicio' || element.name === 'fecha_expiracion') {
+                    const val = element.value ? element.value.trim() : '';
+                    data[element.name] = (val === '' || val === 'null') ? null : val;
+                } else if (element.type === 'select-one' && (element.name === 'tipo' || element.name === 'tipo_vehiculo')) {
+                    // Convertir valores de selects a mayúsculas
+                    data[element.name] = element.value.toUpperCase();
+                } else {
+                    data[element.name] = element.value;
+                }
+            }
+        }
+        
+        // Si es acceso permanente, forzar fecha_expiracion a null
+        if (data.acceso_permanente == 1) {
+            data.fecha_expiracion = null;
+        }
+        
+        // Verificar fecha_inicio
+        if (!data.fecha_inicio) {
+            data.fecha_inicio = new Date().toISOString().split('T')[0];
+        }
+        
+        // Obtener información del asociado
+        if (window.selectedPersonalId) {
+            data.asociado_id = window.selectedPersonalId;
+            data.asociado_tipo = data.tipo; // Usar el tipo de acceso seleccionado como tipo de asociado
+        } else if (id) {
+            // Si estamos editando y no se ha seleccionado un nuevo asociado, mantenemos el anterior
+            const vehiculo = vehiculosData.find(v => v.id == id);
+            if (vehiculo) {
+                data.asociado_id = vehiculo.asociado_id;
+                data.asociado_tipo = vehiculo.asociado_tipo;
+            }
+        } else {
+            data.asociado_id = null;
+            data.asociado_tipo = data.tipo;
+        }
+
+        // Forzar mayúsculas en campos de texto del vehículo antes de enviar
+        if (data.patente) data.patente = String(data.patente).toUpperCase();
+        if (data.marca) data.marca = String(data.marca).toUpperCase();
+        if (data.modelo) data.modelo = String(data.modelo).toUpperCase();
+        if (data.tipo) data.tipo = String(data.tipo).toUpperCase();
+        if (data.tipo_vehiculo) data.tipo_vehiculo = String(data.tipo_vehiculo).toUpperCase();
+
+        try {
+            if (id) {
+                await api.updateVehiculo(data);
+                showToast('Vehículo actualizado correctamente.', 'success');
+                vehiculosData = await api.getVehiculos();
+            } else {
+                await api.createVehiculo(data);
+                showToast('Vehículo creado correctamente.', 'success');
+                [vehiculosData, personalData] = await Promise.all([api.getVehiculos(), api.getPersonal()]);
+            }
+            modal.hide();
+            renderVehiculoTable(vehiculosData);
+        } catch (error) {
+            showToast(error.message, 'error');
+        }
+    }
+
+    async function deleteVehiculo(id) {
+        if (confirm('¿Estás seguro de que quieres eliminar este vehículo?')) {
+            try {
+                await api.deleteVehiculo(id);
+                showToast('Vehículo eliminado correctamente.', 'success');
+                [vehiculosData, personalData] = await Promise.all([api.getVehiculos(), api.getPersonal()]);
+                renderVehiculoTable(vehiculosData);
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+    }
+
+    function generateAndShowQrCode(patente, vehiculoId) {
+        const qrModal = new bootstrap.Modal(document.getElementById('qr-modal'));
+        const qrcodeContainer = document.getElementById('qrcode');
+        qrcodeContainer.innerHTML = '';
+        new QRCode(qrcodeContainer, {
+            text: vehiculoId.toString(),
+            width: 200,
+            height: 200,
+        });
+        document.getElementById('qr-modal-title').textContent = `Código QR del Vehículo: ${patente}`;
+        document.getElementById('qr-patente-text').textContent = patente;
+        document.getElementById('print-qr-btn').onclick = () => {
+            const printContents = document.getElementById('printable-qr-area').innerHTML;
+            const originalContents = document.body.innerHTML;
+            document.body.innerHTML = printContents;
+            window.print();
+            document.body.innerHTML = originalContents;
+            location.reload(); 
+        };
+        qrModal.show();
+    }
+    
+    // Función para mostrar el historial de un vehículo
+    async function showVehiculoHistorial(id, patente) {
+        // Preparar el modal
+        const modalEl = document.getElementById('historial-vehiculo-modal');
+        modalEl.innerHTML = getVehiculoHistorialModalTemplate();
+        const historialModal = new bootstrap.Modal(modalEl);
+        
+        // Establecer la patente en el encabezado
+        document.getElementById('historial-patente').textContent = patente;
+        
+        try {
+            // Cargar los datos del historial
+            const historialData = await api.getVehiculoHistorial(id);
+            
+            // Si no hay datos, mostrar mensaje
+            if (!historialData || !historialData.historial || historialData.historial.length === 0) {
+                document.getElementById('historial-table-body').innerHTML = `
+                    <tr>
+                        <td colspan="5" class="text-center py-4 text-muted">
+                            <i class="bi bi-exclamation-circle me-2"></i>
+                            No hay registros de cambios para este vehículo
+                        </td>
+                    </tr>
+                `;
+                document.getElementById('historial-total-cambios').textContent = '0';
+                document.getElementById('historial-propietario-actual').textContent = 'Sin datos';
+                
+                // Deshabilitar botones de filtro y exportación
+                document.getElementById('historial-filtro-btn').disabled = true;
+                document.getElementById('exportar-historial-btn').disabled = true;
+                document.getElementById('historial-buscar').disabled = true;
+            } else {
+                // Mostrar datos del vehículo
+                const vehiculo = historialData.vehiculo || {};
+                document.getElementById('historial-propietario-actual').textContent = vehiculo.propietario_actual_nombre || 'No asignado';
+                document.getElementById('historial-total-cambios').textContent = historialData.historial.length.toString();
+                
+                // Guardar datos completos para filtrado posterior
+                modalEl.dataset.historialCompleto = JSON.stringify(historialData.historial);
+                
+                // Renderizar tabla de historial
+                renderizarHistorialTabla(historialData.historial);
+                
+                // Configurar filtro de tipo de cambio
+                configurarFiltrosHistorial(modalEl);
+                
+                // Configurar búsqueda en historial
+                configurarBusquedaHistorial(modalEl);
+                
+                // Configurar exportación
+                document.getElementById('exportar-historial-btn').addEventListener('click', () => {
+                    exportarHistorialExcel(historialData, patente);
+                });
+            }
+            
+            // Mostrar el modal
+            historialModal.show();
+        } catch (error) {
+            showToast(error.message || 'Error al cargar el historial del vehículo', 'error');
+        }
+    }
+    
+    // Función para renderizar la tabla de historial
+    function renderizarHistorialTabla(historialData) {
+        document.getElementById('historial-table-body').innerHTML = historialData.map(h => {
+            // Asegurarnos de obtener un tipo de cambio válido para mostrar
+            const tipoCambioMostrar = h.tipo_cambio_texto || getTipoCambioTexto(h.tipo_cambio);
+            
+            return `
+                <tr data-tipo="${h.tipo_cambio}" class="historial-row">
+                    <td>${h.fecha_cambio_formateada || 'Desconocido'}</td>
+                    <td>
+                        <span class="badge ${getBadgeClassByTipoChange(h.tipo_cambio)}">
+                            ${tipoCambioMostrar}
+                        </span>
+                    </td>
+                    <td>${h.propietario_anterior_nombre || 'N/A'}</td>
+                    <td>${h.propietario_nuevo_nombre || 'N/A'}</td>
+                    <td>${h.usuario_nombre || 'Sistema'}</td>
+                </tr>
+            `;
+        }).join('');
+    }
+    
+    // Función para configurar los filtros del historial
+    function configurarFiltrosHistorial(modalEl) {
+        const filtroLinks = modalEl.querySelectorAll('#filtro-tipo-cambio .dropdown-item');
+        const historialCompleto = JSON.parse(modalEl.dataset.historialCompleto);
+        const infoText = modalEl.querySelector('#historial-info-text');
+        
+        filtroLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                
+                // Actualizar estado activo
+                filtroLinks.forEach(l => l.classList.remove('active'));
+                link.classList.add('active');
+                
+                const filtro = link.dataset.filter;
+                let historialFiltrado;
+                
+                if (filtro === 'todos') {
+                    historialFiltrado = historialCompleto;
+                    infoText.textContent = 'Mostrando todos los registros';
+                } else {
+                    historialFiltrado = historialCompleto.filter(h => h.tipo_cambio === filtro);
+                    infoText.textContent = `Mostrando ${historialFiltrado.length} registro(s) de tipo "${getTipoCambioTexto(filtro)}"`;
+                }
+                
+                renderizarHistorialTabla(historialFiltrado);
+            });
+        });
+    }
+    
+    // Función para configurar la búsqueda en el historial
+    function configurarBusquedaHistorial(modalEl) {
+        const searchInput = modalEl.querySelector('#historial-buscar');
+        const historialCompleto = JSON.parse(modalEl.dataset.historialCompleto);
+        const infoText = modalEl.querySelector('#historial-info-text');
+        
+        searchInput.addEventListener('input', (e) => {
+            const busqueda = e.target.value.toLowerCase().trim();
+            
+            if (!busqueda) {
+                renderizarHistorialTabla(historialCompleto);
+                infoText.textContent = 'Mostrando todos los registros';
+                return;
+            }
+            
+            const historialFiltrado = historialCompleto.filter(h => {
+                return (
+                    (h.propietario_anterior_nombre && h.propietario_anterior_nombre.toLowerCase().includes(busqueda)) ||
+                    (h.propietario_nuevo_nombre && h.propietario_nuevo_nombre.toLowerCase().includes(busqueda)) ||
+                    (h.fecha_cambio_formateada && h.fecha_cambio_formateada.toLowerCase().includes(busqueda)) ||
+                    (h.usuario_nombre && h.usuario_nombre.toLowerCase().includes(busqueda)) ||
+                    (h.tipo_cambio_texto && h.tipo_cambio_texto.toLowerCase().includes(busqueda)) ||
+                    (h.tipo_cambio && h.tipo_cambio.toLowerCase().includes(busqueda))
+                );
+            });
+            
+            renderizarHistorialTabla(historialFiltrado);
+            infoText.textContent = `Mostrando ${historialFiltrado.length} resultado(s) para "${busqueda}"`;
+        });
+    }
+    
+    // Función para exportar el historial a Excel
+    function exportarHistorialExcel(historialData, patente) {
+        try {
+            // Crear datos para el Excel
+            const headers = ["Fecha", "Tipo de Cambio", "Propietario Anterior", "Propietario Nuevo", "Usuario"];
+            const data = historialData.historial.map(h => {
+                // Asegurarnos de obtener un tipo de cambio válido
+                const tipoCambioMostrar = h.tipo_cambio_texto || getTipoCambioTexto(h.tipo_cambio);
+                
+                return [
+                    h.fecha_cambio_formateada || 'Desconocido',
+                    tipoCambioMostrar,
+                    h.propietario_anterior_nombre || 'N/A',
+                    h.propietario_nuevo_nombre || 'N/A',
+                    h.usuario_nombre || 'Sistema'
+                ];
+            });
+            
+            // Usar función existente de exportación a Excel si existe
+            if (typeof exportToExcel === 'function') {
+                exportToExcel(`Historial_Vehiculo_${patente}_${formatDate(new Date())}`, headers, data);
+            } else {
+                // Implementación básica de exportación
+                const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Historial");
+                XLSX.writeFile(wb, `Historial_Vehiculo_${patente}_${formatDate(new Date())}.xlsx`);
+            }
+            
+            showToast('Historial exportado correctamente', 'success');
+        } catch (error) {
+            console.error('Error al exportar:', error);
+            showToast('Error al exportar historial', 'error');
+        }
+    }
+    
+    // Función auxiliar para formatear fecha (YYYY-MM-DD)
+    function formatDate(date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+    
+    // Función auxiliar para obtener la clase de badge según el tipo de cambio
+    function getBadgeClassByTipoChange(tipo) {
+        switch (tipo) {
+            case 'creacion':
+                return 'bg-success-subtle text-success-emphasis';
+            case 'actualizacion':
+                return 'bg-info-subtle text-info-emphasis';
+            case 'cambio_propietario':
+                return 'bg-warning-subtle text-warning-emphasis';
+            case 'eliminacion':
+                return 'bg-danger-subtle text-danger-emphasis';
+            default:
+                return 'bg-secondary-subtle text-secondary-emphasis';
+        }
+    }
+    
+    // Función auxiliar para obtener el texto descriptivo del tipo de cambio
+    function getTipoCambioTexto(tipo) {
+        if (!tipo) return 'Tipo no especificado';
+        
+        switch (tipo.toLowerCase()) {
+            case 'creacion':
+                return 'Creación de vehículo';
+            case 'actualizacion':
+                return 'Actualización de datos';
+            case 'cambio_propietario':
+                return 'Cambio de propietario';
+            case 'eliminacion':
+                return 'Eliminación de vehículo';
+            default:
+                // Convertir primera letra a mayúscula para mejor presentación
+                return tipo.charAt(0).toUpperCase() + tipo.slice(1);
+        }
+    }
+
+    // --- MÓDULO: CONTROL DE VEHÍCULOS ---
+    async function initControlVehiculoModule() {
+        mainContent.querySelector('#scan-vehiculo-form').addEventListener('submit', handleScanVehiculoSubmit);
+        try {
+            const logs = await api.getAccessLogs('vehiculo');
+            renderVehiculoLogTable(logs);
+        } catch (error) {
+            showToast(error.message, 'error');
+        }
+    }
+
+    async function handleScanVehiculoSubmit(e) {
+        e.preventDefault();
+        const scanInput = mainContent.querySelector('#scan-vehiculo-input');
+        const targetId = scanInput.value.trim();
+        if (!targetId) return;
+        try {
+            const result = await api.logAccess(targetId, 'vehiculo');
+            showToast(result.message || 'Acceso registrado.');
+            scanInput.value = '';
+            renderVehiculoScanFeedback(result, 'success');
+            initControlVehiculoModule();
+        } catch (error) {
+            showToast(error.message, 'error');
+            renderVehiculoScanFeedback({ message: error.message }, 'error');
+        }
+    }
+
+    function renderVehiculoScanFeedback(data, type) {
+        const feedbackEl = mainContent.querySelector('#vehiculo-scan-feedback');
+        if (!feedbackEl) return;
+        let cardHtml = '';
+        if (type === 'success') {
+            const bgColorClass = data.action === 'entrada' ? 'bg-success-subtle' : 'bg-danger-subtle';
+            const textColorClass = data.action === 'entrada' ? 'text-success-emphasis' : 'text-danger-emphasis';
+            cardHtml = `
+                <div class="card shadow-sm border-0 fade-in-out mt-4">
+                    <div class="card-body text-center p-4 rounded-3 ${bgColorClass}">
+                        <h3 class="h5 fw-bold">${data.patente || 'Desconocida'}</h3>
+                        <p class="text-muted">Asociado: ${data.personalName || 'N/A'}</p>
+                        <p class="mt-2 fw-bold fs-4 text-uppercase ${textColorClass}">${data.action || ''}</p>
+                    </div>
+                </div>`;
+        } else {
+            cardHtml = `
+                <div class="card shadow-sm border-0 fade-in-out mt-4">
+                    <div class="card-body text-center p-4 rounded-3 bg-danger-subtle">
+                        <h3 class="h5 fw-bold text-danger">Error</h3>
+                        <p class="text-muted">${data.message || 'Ha ocurrido un error.'}</p>
+                    </div>
+                </div>`;
+        }
+        feedbackEl.innerHTML = cardHtml;
+        setTimeout(() => { feedbackEl.innerHTML = ''; }, 5000);
+    }
+
+    function renderVehiculoLogTable(logs) {
+        const tableBody = mainContent.querySelector('#vehiculo-log-table');
+        if (!tableBody) return;
+        tableBody.innerHTML = logs.length === 0 ? '<tr><td colspan="4" class="text-center text-muted p-4">No hay registros de acceso.</td></tr>' : logs.map(log => `
+            <tr>
+                <td>${log.patente}</td>
+                <td>${log.personalName}</td>
+                <td><span class="badge ${log.action === 'entrada' ? 'bg-success-subtle text-success-emphasis' : 'bg-danger-subtle text-danger-emphasis'}">${log.action}</span></td>
+                <td>${log.timestamp}</td>
+            </tr>
+        `).join('');
+    }
+
+    // --- MÓDULO: GESTIONAR VISITAS ---
+    let visitaModalInstance = null;
+
+    // Reemplaza la función initVisitasModule completa
+    async function initVisitasModule() {
+        const modalEl = document.getElementById('visita-modal');
+        if (!visitaModalInstance) {
+            visitaModalInstance = new bootstrap.Modal(modalEl);
+            const form = modalEl.querySelector('#visita-form');
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                handleVisitaFormSubmit(e, visitaModalInstance);
+            });
+        }
+        const form = document.getElementById('visita-modal').querySelector('#visita-form');
+        const tipoSelect = form.querySelector('#tipo');
+        const pocFields = form.querySelector('#poc-fields');
+        const familiarFields = form.querySelector('#familiar-fields');
+
+        tipoSelect.addEventListener('change', () => {
+            const selectedType = tipoSelect.value;
+            pocFields.style.display = selectedType === 'Visita' ? 'flex' : 'none';
+            familiarFields.style.display = selectedType === 'Familiar' ? 'flex' : 'none';
+        });
+
+        // --- Lógica para acceso_permanente y fechas ---
+        const accesoPermanenteCheckbox = form.querySelector('#acceso_permanente');
+        const fechaInicioInput = form.querySelector('#fecha_inicio');
+        const fechaExpiracionInput = form.querySelector('#fecha_expiracion');
+        if (accesoPermanenteCheckbox && fechaInicioInput && fechaExpiracionInput) {
+            accesoPermanenteCheckbox.addEventListener('change', () => {
+                if (accesoPermanenteCheckbox.checked) {
+                    fechaInicioInput.disabled = true;
+                    fechaExpiracionInput.disabled = true;
+                    fechaInicioInput.value = '';
+                    fechaExpiracionInput.value = '';
+                } else {
+                    fechaInicioInput.disabled = false;
+                    fechaExpiracionInput.disabled = false;
+                }
+            });
+        }
+
+        const personalList = await api.getPersonal();
+        const personalOptions = document.querySelector('#personal-options');
+        const personalOptionsFamiliar = document.querySelector('#personal-options-familiar');
+
+        const optionsHtml = personalList.map(p =>
+            `<option value="${(p.Grado || '')} ${p.Nombres} ${p.Paterno}" data-id="${p.id}" data-unidad="${p.Unidad}" data-anexo="${p.anexo}"></option>`
+        ).join('');
+
+        personalOptions.innerHTML = optionsHtml;
+        personalOptionsFamiliar.innerHTML = optionsHtml;
+
+        const pocInput = form.querySelector('#poc_personal_input');
+        pocInput.addEventListener('input', () => {
+            const selectedOption = Array.from(personalOptions.options).find(opt => opt.value === pocInput.value);
+            if (selectedOption) {
+                form.querySelector('#poc_personal_id').value = selectedOption.dataset.id;
+                form.querySelector('#poc_unidad').value = selectedOption.dataset.unidad || '';
+                form.querySelector('#poc_anexo').value = selectedOption.dataset.anexo || '';
+            }
+        });
+
+        const familiarInput = form.querySelector('#familiar_de_personal_input');
+        familiarInput.addEventListener('input', () => {
+            const selectedOption = Array.from(personalOptionsFamiliar.options).find(opt => opt.value === familiarInput.value);
+            const familiarIdInput = form.querySelector('#familiar_de_personal_id');
+            const familiarUnidadInput = form.querySelector('#familiar_unidad');
+            const familiarAnexoInput = form.querySelector('#familiar_anexo');
+            if (selectedOption) {
+                familiarIdInput.value = selectedOption.dataset.id;
+                familiarUnidadInput.value = selectedOption.dataset.unidad || '';
+                familiarAnexoInput.value = selectedOption.dataset.anexo || '';
+            } else {
+                familiarIdInput.value = '';
+                familiarUnidadInput.value = '';
+                familiarAnexoInput.value = '';
+            }
+        });
+
+        document.getElementById('add-visita-btn').addEventListener('click', () => openVisitaModal());
+        document.getElementById('search-visita-tabla').addEventListener('input', handleVisitasTableSearch);
+
+        // --- Lógica de Eventos para la Tabla de Visitas ---
+        const moduleContainer = document.getElementById('visitas-module-container');
+        if (moduleContainer) {
+            moduleContainer.addEventListener('click', (e) => {
+                const editBtn = e.target.closest('.edit-visita-btn');
+                const deleteBtn = e.target.closest('.delete-visita-btn');
+                const blacklistBtn = e.target.closest('.toggle-blacklist-btn');
+
+                if (editBtn) {
+                    openVisitaModal(editBtn.dataset.id);
+                } else if (deleteBtn) {
+                    deleteVisita(deleteBtn.dataset.id);
+                } else if (blacklistBtn) {
+                    handleToggleBlacklist(blacklistBtn.dataset.id, blacklistBtn.dataset.blacklisted);
+                }
+            });
+        }
+
+        try {
+            visitasData = await api.getVisitas();
+            renderVisitasTable(visitasData);
+        } catch (error) {
+            showToast(error.message, 'error');
+        }
+    }
+
+    // Reemplaza la función renderVisitasTable completa
+    function renderVisitasTable(data) {
+        const tableBody = mainContent.querySelector('#visita-table-body');
+        if (!tableBody) return;
+
+        tableBody.innerHTML = data.length === 0 ? '<tr><td colspan="7" class="text-center text-muted p-4">No se encontraron resultados.</td></tr>' : data.map(v => {
+            const nombreCompleto = `${v.nombre || ''} ${v.paterno || ''} ${v.materno || ''}`.trim();
+            let detalleTipo = '-';
+            if (v.tipo === 'Familiar' && v.familiar_nombre) {
+                detalleTipo = `Familiar de: ${v.familiar_nombre}`;
+            } else if (v.tipo === 'Visita' && v.poc_nombre) {
+                detalleTipo = `POC: ${v.poc_nombre}`;
+            }
+
+            return `
+                <tr class="${v.en_lista_negra == 1 ? 'table-danger' : ''}">
+                    <td>${nombreCompleto}</td>
+                    <td>${v.rut || 'N/A'}</td>
+                    <td><span class="badge bg-info-subtle text-info-emphasis">${v.tipo}</span></td>
+                    <td>${detalleTipo}</td>
+                    <td><span class="badge ${v.status === 'autorizado' ? 'bg-success-subtle text-success-emphasis' : 'bg-warning-subtle text-warning-emphasis'}">${v.status}</span></td>
+                    <td>${v.acceso_permanente == 1 ? 'Permanente' : (v.fecha_expiracion || 'Sin fecha')}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary edit-visita-btn" data-id="${v.id}" title="Editar"><i class="bi bi-pencil"></i></button>
+                        <button class="btn btn-sm btn-outline-danger delete-visita-btn" data-id="${v.id}" title="Eliminar"><i class="bi bi-trash"></i></button>
+                        <button class="btn btn-sm ${v.en_lista_negra == 1 ? 'btn-outline-success' : 'btn-outline-dark'} toggle-blacklist-btn" data-id="${v.id}" data-blacklisted="${v.en_lista_negra}" title="${v.en_lista_negra == 1 ? 'Quitar de lista negra' : 'Añadir a lista negra'}">
+                            <i class="bi ${v.en_lista_negra == 1 ? 'bi-unlock' : 'bi-lock'}"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    function handleVisitasTableSearch(e) {
+        const query = e.target.value.toLowerCase().trim();
+        const filteredVisitas = visitasData.filter(v => {
+            const nombreCompleto = `${v.nombre || ''} ${v.paterno || ''} ${v.materno || ''}`.toLowerCase();
+            return nombreCompleto.includes(query) || (v.rut || '').toLowerCase().includes(query);
+        });
+        renderVisitasTable(filteredVisitas);
+    }
+
+    // Reemplaza la función openVisitaModal completa
+    function openVisitaModal(id = null) {
+        if (!visitaModalInstance) return;
+
+        const modalEl = document.getElementById('visita-modal');
+        const form = modalEl.querySelector('#visita-form');
+        const modalTitle = modalEl.querySelector('#visita-modal-title');
+        form.reset();
+        form.classList.remove('was-validated');
+
+        if (id) {
+            modalTitle.textContent = 'Editar Visita';
+            const visita = visitasData.find(v => v.id == id);
+            if (visita) {
+                // Llenar campos básicos
+                form.elements.id.value = visita.id;
+                form.elements.nombre.value = visita.nombre || '';
+                form.elements.paterno.value = visita.paterno || '';
+                form.elements.materno.value = visita.materno || '';
+                form.elements.rut.value = visita.rut || '';
+                form.elements.movil.value = visita.movil || '';
+                form.elements.tipo.value = visita.tipo || 'Visita';
+
+                // Llenar campos condicionales y de autocompletado
+                if (visita.tipo === 'Visita') {
+                    form.elements.poc_personal_input.value = visita.poc_nombre || '';
+                    form.elements.poc_personal_id.value = visita.poc_personal_id || '';
+                    form.elements.poc_unidad.value = visita.poc_unidad || '';
+                    form.elements.poc_anexo.value = visita.poc_anexo || '';
+                } else if (visita.tipo === 'Familiar') {
+                    form.elements.familiar_de_personal_input.value = visita.familiar_nombre || '';
+                    form.elements.familiar_de_personal_id.value = visita.familiar_de_personal_id || '';
+                    form.elements.familiar_unidad.value = visita.familiar_unidad || '';
+                    form.elements.familiar_anexo.value = visita.familiar_anexo || '';
+                }
+
+                // Llenar campos de control de acceso
+                form.elements.fecha_inicio.value = visita.fecha_inicio || '';
+                form.elements.fecha_expiracion.value = visita.fecha_expiracion || '';
+                form.elements.acceso_permanente.checked = (visita.acceso_permanente == 1);
+                form.elements.en_lista_negra.checked = (visita.en_lista_negra == 1);
+            }
+        } else {
+            modalTitle.textContent = 'Agregar Visita';
+        }
+
+        // Actualizar visibilidad de campos
+        form.querySelector('#tipo').dispatchEvent(new Event('change'));
+        form.querySelector('#en_lista_negra').dispatchEvent(new Event('change'));
+
+        // --- Disparar el evento change del checkbox para asegurar el estado correcto de los campos de fecha ---
+        const accesoPermanenteCheckbox = form.querySelector('#acceso_permanente');
+        if (accesoPermanenteCheckbox) {
+            accesoPermanenteCheckbox.dispatchEvent(new Event('change'));
+        }
+
+        visitaModalInstance.show();
+    }
+
+    async function handleVisitaFormSubmit(e, modal) {
+        const form = e.target;
+        if (!form.checkValidity()) {
+            e.stopPropagation();
+            form.classList.add('was-validated');
+            return;
+        }
+
+        const id = form.elements.id.value;
+        const data = {};
+        for (const element of form.elements) {
+            if (element.name) {
+                // Para los campos readonly, también los incluimos
+                data[element.name] = element.type === 'checkbox' ? element.checked : element.value;
+            }
+        }
+
+        try {
+            if (id) {
+                await api.updateVisita(data);
+                showToast('Visita actualizada correctamente.', 'success');
+            } else {
+                await api.createVisita(data);
+                showToast('Visita creada correctamente.', 'success');
+            }
+            modal.hide();
+            visitasData = await api.getVisitas();
+            renderVisitasTable(visitasData);
+        } catch (error) {
+            showToast(error.message, 'error');
+        }
+    }
+
+    async function deleteVisita(id) {
+        if (confirm('¿Estás seguro de que quieres eliminar esta visita?')) {
+            try {
+                await api.deleteVisita(id);
+                showToast('Visita eliminada correctamente.', 'success');
+                visitasData = await api.getVisitas();
+                renderVisitasTable(visitasData);
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+    }
+
+    async function handleToggleBlacklist(id, isBlacklisted) {
+        const newStatus = isBlacklisted === 'true' ? 0 : 1;
+        const actionText = newStatus === 1 ? 'añadir a la' : 'quitar de la';
+        if (confirm(`¿Estás seguro de que quieres ${actionText} lista negra a esta visita?`)) {
+            try {
+                await api.toggleBlacklistVisita(id, newStatus);
+                showToast('Estado de lista negra actualizado.', 'success');
+                visitasData = await api.getVisitas();
+                renderVisitasTable(visitasData);
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+    }
+    
+    // --- MÓDULO: CONTROL DE VISITAS ---
+    async function initControlVisitasModule() {
+        mainContent.querySelector('#scan-visita-form').addEventListener('submit', handleScanVisitaSubmit);
+        try {
+            const logs = await api.getAccessLogs('visita');
+            renderVisitaLogTable(logs);
+        } catch (error) {
+            showToast(error.message, 'error');
+        }
+    }
+
+    async function handleScanVisitaSubmit(e) {
+        e.preventDefault();
+        const scanInput = mainContent.querySelector('#scan-visita-input');
+        const targetId = scanInput.value.trim();
+        if (!targetId) return;
+        try {
+            const result = await api.logAccess(targetId, 'visita');
+            showToast(result.message || 'Acceso registrado.');
+            scanInput.value = '';
+            renderVisitaScanFeedback(result, 'success');
+            initControlVisitasModule();
+        } catch (error) {
+            showToast(error.message, 'error');
+            renderVisitaScanFeedback({ message: error.message }, 'error');
+        }
+    }
+
+    function renderVisitaScanFeedback(data, type) {
+        const feedbackEl = mainContent.querySelector('#visita-scan-feedback');
+        if (!feedbackEl) return;
+        let cardHtml = '';
+        if (type === 'success') {
+            const bgColorClass = data.action === 'entrada' ? 'bg-success-subtle' : 'bg-danger-subtle';
+            const textColorClass = data.action === 'entrada' ? 'text-success-emphasis' : 'text-danger-emphasis';
+            cardHtml = `
+                <div class="card shadow-sm border-0 fade-in-out mt-4">
+                    <div class="card-body text-center p-4 rounded-3 ${bgColorClass}">
+                        <h3 class="h5 fw-bold">${data.nombre || 'Desconocido'}</h3>
+                        <p class="text-muted">Empresa: ${data.empresa || 'N/A'}</p>
+                        <p class="mt-2 fw-bold fs-4 text-uppercase ${textColorClass}">${data.action || ''}</p>
+                    </div>
+                </div>`;
+        } else {
+            cardHtml = `
+                <div class="card shadow-sm border-0 fade-in-out mt-4">
+                    <div class="card-body text-center p-4 rounded-3 bg-danger-subtle">
+                        <h3 class="h5 fw-bold text-danger">Error</h3>
+                        <p class="text-muted">${data.message || 'Ha ocurrido un error.'}</p>
+                    </div>
+                </div>`;
+        }
+        feedbackEl.innerHTML = cardHtml;
+        setTimeout(() => { feedbackEl.innerHTML = ''; }, 5000);
+    }
+
+    function renderVisitaLogTable(logs) {
+        const tableBody = mainContent.querySelector('#visita-log-table');
+        if (!tableBody) return;
+        tableBody.innerHTML = logs.length === 0 ? '<tr><td colspan="5" class="text-center text-muted p-4">No hay registros de acceso.</td></tr>' : logs.map(log => `
+            <tr>
+                <td>${log.nombre}</td>
+                <td>${log.empresa}</td>
+                <td><span class="badge bg-info-subtle text-info-emphasis">${log.tipo || 'N/A'}</span></td>
+                <td><span class="badge ${log.action === 'entrada' ? 'bg-success-subtle text-success-emphasis' : 'bg-danger-subtle text-danger-emphasis'}">${log.action}</span></td>
+                <td>${log.timestamp}</td>
+            </tr>
+        `).join('');
+    }
+
+    // --- UTILIDADES ---
+
+    // --- MÓDULO: GESTIONAR EMPRESAS ---
+    async function initEmpresasModule() {
+        let empresasData = [];
+        let empleadosData = [];
+        let selectedEmpresaId = null;
+
+        const empresaModalEl = document.createElement('div');
+        empresaModalEl.className = 'modal fade';
+        empresaModalEl.id = 'empresa-modal';
+        empresaModalEl.innerHTML = getEmpresaModalTemplate();
+        document.body.appendChild(empresaModalEl);
+        const empresaModal = new bootstrap.Modal(empresaModalEl);
+
+        const empleadoModalEl = document.createElement('div');
+        empleadoModalEl.className = 'modal fade';
+        empleadoModalEl.id = 'empleado-modal';
+        empleadoModalEl.innerHTML = getEmpresaEmpleadoModalTemplate();
+        document.body.appendChild(empleadoModalEl);
+        const empleadoModal = new bootstrap.Modal(empleadoModalEl);
+
+        const accesoPermanenteCheckbox = empleadoModalEl.querySelector('#empleado_acceso_permanente');
+        const fechaExpiracionInput = empleadoModalEl.querySelector('#empleado_fecha_expiracion');
+
+        accesoPermanenteCheckbox.addEventListener('change', (e) => {
+            fechaExpiracionInput.disabled = e.target.checked;
+            if (e.target.checked) {
+                fechaExpiracionInput.value = '';
+            }
+        });
+
+        const empresasList = mainContent.querySelector('#empresas-list');
+        const empleadosTableBody = mainContent.querySelector('#empleados-table-body');
+        const addEmpresaBtn = mainContent.querySelector('#add-empresa-btn');
+        const addEmpleadoBtn = mainContent.querySelector('#add-empleado-btn');
+        const searchEmpresaInput = mainContent.querySelector('#search-empresa');
+        const searchEmpleadoInput = mainContent.querySelector('#search-empleado-input');
+        const empleadosHeader = mainContent.querySelector('#empleados-header');
+
+        // --- Lógica de Empresas ---
+        async function loadAndRenderEmpresas() {
+            empresasData = await api.getEmpresas();
+            renderEmpresas(empresasData);
+        }
+
+        function renderEmpresas(data) {
+            empresasList.innerHTML = data.length === 0
+                ? '<li class="list-group-item text-center text-muted">No hay empresas.</li>'
+                : data.map(empresa => `
+                    <a href="#" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" data-id="${empresa.id}">
+                        ${empresa.nombre}
+                        <div>
+                            <button class="btn btn-sm btn-outline-primary edit-empresa-btn" data-id="${empresa.id}"><i class="bi bi-pencil"></i></button>
+                            <button class="btn btn-sm btn-outline-danger delete-empresa-btn" data-id="${empresa.id}"><i class="bi bi-trash"></i></button>
+                        </div>
+                    </a>
+                `).join('');
+        }
+
+        addEmpresaBtn.addEventListener('click', () => openEmpresaModal());
+
+        function openEmpresaModal(id = null) {
+            const form = empresaModalEl.querySelector('#empresa-form');
+            form.reset();
+            const title = empresaModalEl.querySelector('#empresa-modal-title');
+            const feedback = empresaModalEl.querySelector('#poc-rut-feedback');
+            feedback.textContent = '';
+            if (id) {
+                title.textContent = 'Editar Empresa';
+                const empresa = empresasData.find(e => e.id == id);
+                if (empresa) {
+                    form.elements.id.value = empresa.id;
+                    form.elements.nombre.value = empresa.nombre;
+                    form.elements.unidad_poc.value = empresa.unidad_poc;
+                    form.elements.poc_rut.value = empresa.poc_rut;
+                    form.elements.poc_anexo.value = empresa.poc_anexo || '';
+                    if(empresa.poc_nombre) feedback.textContent = `POC: ${empresa.poc_nombre}`;
+                }
+            } else {
+                title.textContent = 'Agregar Empresa';
+                form.elements.id.value = '';
+            }
+            empresaModal.show();
+        }
+
+        empresaModalEl.querySelector('#empresa-form').addEventListener('submit', async e => {
+            e.preventDefault();
+            const form = e.target;
+            const data = Object.fromEntries(new FormData(form));
+            try {
+                if (data.id) {
+                    await api.updateEmpresa(data);
+                } else {
+                    await api.createEmpresa(data);
+                }
+                showToast('Empresa guardada.', 'success');
+                empresaModal.hide();
+                loadAndRenderEmpresas();
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        });
+
+        empresaModalEl.querySelector('#verify-poc-rut-btn').addEventListener('click', async () => {
+            const rutInput = empresaModalEl.querySelector('#poc_rut');
+            const feedback = empresaModalEl.querySelector('#poc-rut-feedback');
+            const nombreInput = empresaModalEl.querySelector('#poc_nombre');
+            const anexoInput = empresaModalEl.querySelector('#poc_anexo');
+            const rut = rutInput.value.trim();
+            if (!rut) return;
+            try {
+                const personal = await api.findPersonalByRut(rut);
+                if (personal) {
+                    const nombreCompleto = `${personal.Grado || ''} ${personal.Nombres} ${personal.Paterno}`.trim();
+                    feedback.textContent = `Encontrado: ${nombreCompleto}`;
+                    feedback.className = 'form-text text-success';
+                    nombreInput.value = nombreCompleto;
+                    anexoInput.value = personal.anexo || '';
+                } else {
+                    feedback.textContent = 'RUT no encontrado.';
+                    feedback.className = 'form-text text-danger';
+                }
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        });
+
+        // --- Lógica de Empleados ---
+        async function loadAndRenderEmpleados(empresaId) {
+            empleadosData = await api.getEmpresaEmpleados(empresaId);
+            renderEmpleados(empleadosData);
+        }
+
+        function renderEmpleados(data) {
+            empleadosTableBody.innerHTML = data.length === 0
+                ? '<tr><td colspan="5" class="text-center text-muted p-4">Esta empresa no tiene empleados registrados.</td></tr>'
+                : data.map(emp => `
+                    <tr>
+                        <td>${emp.nombre} ${emp.paterno} ${emp.materno || ''}</td>
+                        <td>${emp.rut}</td>
+                        <td><span class="badge ${emp.status === 'autorizado' ? 'bg-success-subtle text-success-emphasis' : 'bg-warning-subtle text-warning-emphasis'}">${emp.status}</span></td>
+                        <td>${emp.acceso_permanente ? 'Permanente' : (emp.fecha_expiracion || 'N/A')}</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary edit-empleado-btn" data-id="${emp.id}"><i class="bi bi-pencil"></i></button>
+                            <button class="btn btn-sm btn-outline-danger delete-empleado-btn" data-id="${emp.id}"><i class="bi bi-trash"></i></button>
+                        </td>
+                    </tr>
+                `).join('');
+        }
+
+        addEmpleadoBtn.addEventListener('click', () => openEmpleadoModal());
+
+        function openEmpleadoModal(id = null) {
+            const form = empleadoModalEl.querySelector('#empleado-form');
+            form.reset();
+            const title = empleadoModalEl.querySelector('#empleado-modal-title');
+            form.elements.empresa_id.value = selectedEmpresaId;
+            if (id) {
+                title.textContent = 'Editar Empleado';
+                const empleado = empleadosData.find(e => e.id == id);
+                if (empleado) {
+                    form.elements.id.value = empleado.id;
+                    form.elements.nombre.value = empleado.nombre;
+                    form.elements.paterno.value = empleado.paterno;
+                    form.elements.materno.value = empleado.materno;
+                    form.elements.rut.value = empleado.rut;
+                    form.elements.fecha_expiracion.value = empleado.fecha_expiracion;
+                    form.elements.acceso_permanente.checked = !!empleado.acceso_permanente;
+                }
+            } else {
+                title.textContent = 'Agregar Empleado';
+            }
+            form.elements.acceso_permanente.dispatchEvent(new Event('change'));
+            empleadoModal.show();
+        }
+
+        empleadoModalEl.querySelector('#empleado-form').addEventListener('submit', async e => {
+            e.preventDefault();
+            const form = e.target;
+            const data = Object.fromEntries(new FormData(form));
+            data.acceso_permanente = form.elements.acceso_permanente.checked;
+            try {
+                if (data.id) {
+                    await api.updateEmpresaEmpleado(data);
+                } else {
+                    await api.createEmpresaEmpleado(data);
+                }
+                showToast('Empleado guardado.', 'success');
+                empleadoModal.hide();
+                loadAndRenderEmpleados(selectedEmpresaId);
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        });
+
+        // --- Eventos Generales del Módulo ---
+        empresasList.addEventListener('click', e => {
+            const link = e.target.closest('a.list-group-item');
+            const editBtn = e.target.closest('.edit-empresa-btn');
+            const deleteBtn = e.target.closest('.delete-empresa-btn');
+
+            if (editBtn) {
+                e.preventDefault();
+                openEmpresaModal(editBtn.dataset.id);
+            } else if (deleteBtn) {
+                e.preventDefault();
+                if (confirm('¿Eliminar esta empresa y todos sus empleados?')) {
+                    api.deleteEmpresa(deleteBtn.dataset.id).then(() => {
+                        showToast('Empresa eliminada.', 'success');
+                        loadAndRenderEmpresas();
+                        empleadosTableBody.innerHTML = '<tr><td colspan="5" class="text-center text-muted p-4">No hay empresa seleccionada.</td></tr>';
+                        empleadosHeader.textContent = 'Seleccione una empresa';
+                        mainContent.querySelector('#poc-info-header').textContent = '';
+                        addEmpleadoBtn.style.display = 'none';
+                    }).catch(err => showToast(err.message, 'error'));
+                }
+            } else if (link) {
+                e.preventDefault();
+                selectedEmpresaId = link.dataset.id;
+                document.querySelectorAll('#empresas-list a').forEach(a => a.classList.remove('active'));
+                link.classList.add('active');
+                const empresa = empresasData.find(e => e.id == selectedEmpresaId);
+                empleadosHeader.textContent = `Empleados de ${empresa.nombre}`;
+                
+                const pocInfoHeader = mainContent.querySelector('#poc-info-header');
+                let pocInfo = 'Sin POC asignado.';
+                if (empresa.poc_nombre) {
+                    pocInfo = `POC: ${empresa.poc_nombre}`;
+                    if (empresa.unidad_poc) pocInfo += ` (${empresa.unidad_poc})`;
+                    if (empresa.poc_anexo) pocInfo += ` - Anexo: ${empresa.poc_anexo}`;
+                }
+                pocInfoHeader.textContent = pocInfo;
+
+                addEmpleadoBtn.style.display = 'block';
+                loadAndRenderEmpleados(selectedEmpresaId);
+            }
+        });
+
+        empleadosTableBody.addEventListener('click', e => {
+            const editBtn = e.target.closest('.edit-empleado-btn');
+            const deleteBtn = e.target.closest('.delete-empleado-btn');
+
+            if (editBtn) {
+                openEmpleadoModal(editBtn.dataset.id);
+            } else if (deleteBtn) {
+                if (confirm('¿Eliminar este empleado?')) {
+                    api.deleteEmpresaEmpleado(deleteBtn.dataset.id).then(() => {
+                        showToast('Empleado eliminado.', 'success');
+                        loadAndRenderEmpleados(selectedEmpresaId);
+                    }).catch(err => showToast(err.message, 'error'));
+                }
+            }
+        });
+
+        searchEmpresaInput.addEventListener('input', e => {
+            const query = e.target.value.toLowerCase();
+            const filtered = empresasData.filter(emp => emp.nombre.toLowerCase().includes(query));
+            renderEmpresas(filtered);
+        });
+
+        searchEmpleadoInput.addEventListener('input', e => {
+            const query = e.target.value.toLowerCase().trim();
+            if (!empleadosData.length) return;
+
+            const filtered = empleadosData.filter(emp => {
+                const nombreCompleto = `${emp.nombre} ${emp.paterno} ${emp.materno || ''}`.toLowerCase();
+                const rut = (emp.rut || '').toLowerCase();
+                return nombreCompleto.includes(query) || rut.includes(query);
+            });
+            renderEmpleados(filtered);
+        });
+
+        loadAndRenderEmpresas(); // Carga inicial
+    }
+
+    // --- INICIO DE LA APP ---
+    init();
+});

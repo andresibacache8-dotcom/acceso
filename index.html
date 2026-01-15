@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Control de Acceso Digital (SCAD)</title>
+    <link href="../Libreria/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <!-- Fuentes y Estilos locales -->
+    <link href="../Libreria/vendor/fonts/inter/inter.css" rel="stylesheet">
+    <link rel="stylesheet" href="../Libreria/vendor/bootstrap-icons/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="../Libreria/vendor/font-awesome/css/all.min.css">
+    <link rel="stylesheet" href="../Libreria/vendor/animate-css/animate.min.css">
+</head>
+<body>
+    <div id="app">
+        <div class="d-flex vh-100">
+            <div class="d-flex flex-column flex-shrink-0 p-3 text-white bg-dark" style="width: 280px;">
+                <a href="#inicio" class="d-flex align-items-center mb-3 mb-md-0 me-md-auto text-white text-decoration-none nav-link-title">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="me-3"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                    <span class="fs-4">SCAD</span>
+                </a>
+                <hr>
+                <ul class="nav nav-pills flex-column mb-auto">
+                    <li class="nav-item"><a href="#inicio" class="nav-link active"><i class="bi bi-house-door me-2"></i>Inicio</a></li>
+                    <li><a href="#portico" class="nav-link text-white"><i class="bi bi-upc-scan me-2"></i>Pórtico</a></li>
+                    <li><a href="#control-personal" class="nav-link text-white"><i class="bi bi-building me-2"></i>Control de Unidades</a></li>
+
+                    <!-- Mantenedores -->
+                    <li class="nav-item">
+                        <a href="#" data-bs-toggle="collapse" data-bs-target="#mantenedores-submenu" class="nav-link text-white" aria-expanded="false">
+                            <i class="bi bi-journal-album me-2"></i>Mantenedores
+                        </a>
+                        <div class="collapse" id="mantenedores-submenu">
+                            <ul class="nav flex-column ms-4">
+                                <li class="nav-item"><a href="#mantenedor-personal" class="nav-link text-white"><i class="bi bi-people me-2"></i>Personal</a></li>
+                                <li class="nav-item"><a href="#mantenedor-vehiculos" class="nav-link text-white"><i class="bi bi-truck me-2"></i>Vehículos</a></li>
+                                <li class="nav-item"><a href="#mantenedor-empresas" class="nav-link text-white"><i class="bi bi-building me-2"></i>Empresas</a></li>
+                                <li class="nav-item"><a href="#mantenedor-visitas" class="nav-link text-white"><i class="bi bi-person-badge me-2"></i>Visitas</a></li>
+                                <li class="nav-item"><a href="#mantenedor-comision" class="nav-link text-white"><i class="bi bi-person-vcard me-2"></i>Personal en Comisión</a></li>
+                            </ul>
+                        </div>
+                    </li>
+
+                    <li><a href="#horas-extra" class="nav-link text-white"><i class="bi bi-clock-history me-2"></i>Salida Posterior</a></li>
+                    <li><a href="#guardia-servicio" class="nav-link text-white"><i class="bi bi-shield-fill-check me-2"></i>Guardia y Servicio</a></li>
+                    <li><a href="#reportes" class="nav-link text-white"><i class="bi bi-file-earmark-text me-2"></i>Reportes</a></li>
+                </ul>
+                <hr>
+                <div class="d-grid">
+                    <button id="logout-button" class="btn btn-danger"><i class="bi bi-box-arrow-right me-2"></i>Cerrar Sesión</button>
+                </div>
+            </div>
+            <main class="flex-grow-1 p-4 overflow-auto bg-light">
+                <!-- Los módulos se cargarán dinámicamente aquí por JavaScript -->
+            </main>
+        </div>
+    </div>
+    
+    <!-- Contenedores para Modales (El contenido se inyecta con JS) -->
+    <div class="modal fade" id="personal-modal" tabindex="-1"></div>
+    <div class="modal fade" id="import-personal-modal" tabindex="-1"></div>
+    <div class="modal fade" id="import-progress-modal" tabindex="-1"></div>
+    <div class="modal fade" id="vehiculo-modal" tabindex="-1"></div>
+    <div class="modal fade" id="historial-vehiculo-modal" tabindex="-1"></div>
+    <div class="modal fade" id="comision-modal" tabindex="-1"></div>
+    <div class="modal fade" id="dashboard-detail-modal" tabindex="-1"></div>
+    <div class="modal fade" id="visita-modal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <form id="visita-form" novalidate>
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="visita-modal-title"></h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        <input type="hidden" id="id" name="id">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label for="nombre" class="form-label">Nombres <span class="text-danger">*</span></label>
+                                <input type="text" id="nombre" name="nombre" class="form-control" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="paterno" class="form-label">Apellido Paterno <span class="text-danger">*</span></label>
+                                <input type="text" id="paterno" name="paterno" class="form-control" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="materno" class="form-label">Apellido Materno <span class="text-danger">*</span></label>
+                                <input type="text" id="materno" name="materno" class="form-control" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="rut" class="form-label">RUT <span class="text-danger">*</span></label>
+                                <input type="text" id="rut" name="rut" class="form-control" pattern="[0-9]{7,8}" placeholder="ej: 12345678" required>
+                                <small class="form-text text-muted">7 u 8 dígitos sin dígito verificador</small>
+                                <div id="rut-feedback" class="form-text text-muted mt-1"></div>
+                                <div class="invalid-feedback">Por favor, ingrese un RUT válido (7 u 8 dígitos sin dígito verificador).</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="movil" class="form-label">Móvil</label>
+                                <input type="text" id="movil" name="movil" class="form-control" pattern="[0-9]{8,9}" placeholder="ej: 987654321">
+                                <small class="form-text text-muted">8 o 9 dígitos</small>
+                                <div class="invalid-feedback">Por favor, ingrese un número válido (8 o 9 dígitos).</div>
+                            </div>
+
+                            <div class="col-md-12">
+                                <label for="tipo" class="form-label">Tipo</label>
+                                <select id="tipo" name="tipo" class="form-select">
+                                    <option value="Visita" selected>Visita</option>
+                                    <option value="Familiar">Familiar</option>
+                                </select>
+                            </div>
+
+                            <!-- Campos para el POC (ocultos por defecto) -->
+                            <div id="poc-fields" class="row g-3 mt-1" style="display: none;">
+                                <div class="col-md-12">
+                                    <label for="poc_rut_visita" class="form-label">RUT o Nombre del POC <span style="color: red;">*</span></label>
+                                    <input type="text" id="poc_rut_visita" name="poc_rut_visita_search" class="form-control" placeholder="Ingrese RUT o nombre para buscar" autocomplete="off">
+                                    <input type="hidden" id="poc_personal_id_visita" name="poc_personal_id">
+                                    <input type="hidden" id="poc_nombre_visita" name="poc_nombre">
+                                    <input type="hidden" id="poc_rut_hidden_visita" name="poc_rut">
+                                    <small id="poc-rut-display" class="form-text text-muted d-block mt-1"></small>
+                                    <small id="poc-rut-feedback-visita" class="form-text"></small>
+
+                                    <!-- Contenedor para resultados de búsqueda de POC -->
+                                    <div id="poc-search-results-visita" class="list-group mt-2" style="max-height: 200px; overflow-y: auto; display: none;">
+                                        <!-- Los resultados se insertarán aquí dinámicamente -->
+                                    </div>
+                                </div>
+                                <div class="col-md-12">
+                                    <label for="poc_unidad_visita" class="form-label">Unidad del POC</label>
+                                    <input type="text" id="poc_unidad_visita" name="poc_unidad" class="form-control" readonly>
+                                </div>
+                                <div class="col-md-12">
+                                    <label for="poc_anexo_visita" class="form-label">Anexo del POC</label>
+                                    <input type="text" id="poc_anexo_visita" name="poc_anexo" class="form-control">
+                                </div>
+                            </div>
+                            <!-- Campos para Familiar (ocultos por defecto) -->
+                            <div id="familiar-fields" class="row g-3 mt-1" style="display: none;">
+                                <div class="col-md-12">
+                                    <label for="familiar_de_personal_input" class="form-label">Familiar de <span style="color: red;">*</span></label>
+                                    <input type="text" id="familiar_de_personal_input" name="familiar_de_personal_input_search" class="form-control" placeholder="Ingrese nombre o RUT para buscar" autocomplete="off">
+                                    <input type="hidden" id="familiar_personal_id_visita" name="familiar_de_personal_id">
+                                    <input type="hidden" id="familiar_nombre_visita" name="familiar_nombre">
+                                    <input type="hidden" id="familiar_rut_hidden_visita" name="familiar_rut">
+                                    <small id="familiar-rut-display" class="form-text text-muted d-block mt-1"></small>
+
+                                    <!-- Contenedor para resultados de búsqueda de Familiar -->
+                                    <div id="familiar-search-results-visita" class="list-group mt-2" style="max-height: 200px; overflow-y: auto; display: none;">
+                                        <!-- Los resultados se insertarán aquí dinámicamente -->
+                                    </div>
+                                </div>
+                                <div class="col-md-8">
+                                    <label for="familiar_unidad" class="form-label">Unidad del Familiar</label>
+                                    <input type="text" class="form-control" id="familiar_unidad" name="familiar_unidad" readonly>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="familiar_anexo" class="form-label">Anexo del Familiar</label>
+                                    <input type="text" class="form-control" id="familiar_anexo" name="familiar_anexo">
+                                </div>
+                            </div>
+                            <hr class="my-3">
+                            <h6 class="text-muted">Control de Acceso</h6>
+                            <div class="col-md-6">
+                                <label for="fecha_inicio" class="form-label">Fecha de Inicio <span class="text-danger">*</span></label>
+                                <input type="date" id="fecha_inicio" name="fecha_inicio" class="form-control" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="fecha_expiracion" class="form-label">Fecha de Expiración <span class="text-danger" id="fecha-expiracion-required">*</span></label>
+                                <input type="date" id="fecha_expiracion" name="fecha_expiracion" class="form-control">
+                            </div>
+                            <div class="col-md-6 align-self-center">
+                                <div class="form-check form-switch mt-3">
+                                    <input class="form-check-input" type="checkbox" id="acceso_permanente" name="acceso_permanente">
+                                    <label class="form-check-label" for="acceso_permanente">
+                                        Acceso Permanente
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-6 align-self-center">
+                                <div class="form-check form-switch mt-3">
+                                    <input class="form-check-input" type="checkbox" id="en_lista_negra" name="en_lista_negra">
+                                    <label class="form-check-label text-danger" for="en_lista_negra">
+                                        En Lista Negra
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Guardar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="modal fade" id="qr-modal" tabindex="-1">
+        <div class="modal-dialog modal-sm modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-body text-center" id="printable-qr-area">
+                    <h5 id="qr-modal-title" class="modal-title mb-4">Código QR del Vehículo</h5>
+                    <div id="qrcode" class="d-flex justify-content-center p-2 border rounded-3"></div>
+                    <p class="mt-4 fs-4 fw-bold" id="qr-patente-text" style="font-family: monospace; letter-spacing: 0.15em;"></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                    <button type="button" id="print-qr-btn" class="btn btn-primary">Imprimir</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="clarification-modal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Aclaración de Ingreso</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <img src="" id="clarification-person-photo" class="rounded-circle mb-3" width="128" height="128" style="object-fit: cover;" alt="Foto de la persona">
+                    <h4 class="mb-1" id="clarification-person-name"></h4>
+                    <p class="text-muted" id="clarification-person-unit"></p>
+                    <hr>
+                    <p class="mb-3">Esta persona no es residente. Por favor, especifique el motivo del ingreso:</p>
+                    <form id="clarification-form">
+                        <input type="hidden" id="clarification-person-id">
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="clarificationReason" id="reason-trabajo" value="trabajo" checked>
+                                <label class="form-check-label" for="reason-trabajo">
+                                    Viene a trabajar (registrar como entrada de oficina)
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="clarificationReason" id="reason-otros" value="otros">
+                                <label class="form-check-label" for="reason-otros">
+                                    Otro motivo
+                                </label>
+                            </div>
+                        </div>
+                        <div class="mb-3" id="clarification-otros-details-container" style="display: none;">
+                            <label for="clarification-otros-details" class="form-label">Especifique el motivo:</label>
+                            <textarea id="clarification-otros-details" class="form-control" rows="3"></textarea>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="submit" class="btn btn-primary">Registrar Ingreso</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contenedor para Notificaciones (Toast) -->
+    <div class="toast-container position-fixed top-0 end-0 p-3">
+        <div id="toast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="toast-header">
+                <span class="toast-icon me-2"></span>
+                <strong class="me-auto" id="toast-title">Notificación</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+            <div class="toast-body" id="toast-message"></div>
+        </div>
+    </div>
+    
+    <!-- Spinner de Carga -->
+    <div id="loading-spinner" class="d-none position-fixed top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center" style="background-color: rgba(0,0,0,0.5); z-index: 1060;">
+        <div class="spinner-border text-light" style="width: 3rem; height: 3rem;" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+
+    <!-- Modal de Bloqueo - Control de Unidades -->
+    <div class="modal fade" id="control-personal-locked-modal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-warning">
+                <div class="modal-header bg-warning-subtle border-warning">
+                    <h5 class="modal-title">
+                        <i class="bi bi-lock-fill me-2 text-warning"></i>Módulo Bloqueado
+                    </h5>
+                </div>
+                <div class="modal-body text-center p-5">
+                    <i class="bi bi-lock-fill display-1 text-warning mb-3"></i>
+                    <h4 class="mb-3">Bloqueado por la Guardia</h4>
+                    <p class="text-muted mb-0">
+                        Este módulo se encuentra bloqueado. Para registrar acceso de personal,<br>
+                        debe registrarse por el Pórtico.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Scripts -->
+    <script src="../Libreria/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="js/qrcode.min.js"></script>
+    <script src="js/xlsx.full.min.js"></script>
+    <script src="js/sounds.js"></script>
+    <script src="js/utils/api.js?v=1725296422"></script>
+    <!-- Module principal que importa todos los módulos funcionales -->
+    <script type="module" src="js/main-refactored.js"></script>
+</body>
+</html>

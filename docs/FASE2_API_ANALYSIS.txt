@@ -1,0 +1,606 @@
+================================================================================
+ANÁLISIS COMPLETO DE LLAMADAS HTTP - MAIN.JS
+================================================================================
+Fecha: 2025-10-25
+Analista: GitHub Copilot
+Archivo analizado: js/main.js (4,038 líneas)
+Archivo de API actual: js/api.js (543 líneas)
+
+================================================================================
+RESUMEN EJECUTIVO
+================================================================================
+
+Total de llamadas api.*: 72 llamadas únicas
+Endpoints PHP involucrados: 11 archivos
+Métodos HTTP utilizados: GET, POST, PUT, DELETE
+Patrón actual: Objeto global 'api' con métodos async
+
+DISTRIBUCIÓN POR ENDPOINT:
+- api/personal.php: 10 operaciones
+- api/vehiculos.php: 6 operaciones
+- api/visitas.php: 6 operaciones
+- api/horas_extra.php: 4 operaciones
+- api/portico.php: 3 operaciones
+- api/empresas.php: 4 operaciones
+- api/empresa_empleados.php: 4 operaciones
+- api/comision.php: 4 operaciones
+- api/dashboard.php: 2 operaciones
+- api/vehiculo_historial.php: 1 operación
+- api/reportes.php: 1 operación
+- api/log_access.php: 2 operaciones
+- api/log_clarified_access.php: 1 operación
+- api/auth.php: 1 operación
+- api/users.php: 4 operaciones
+
+================================================================================
+1. LLAMADAS A api/personal.php
+================================================================================
+
+OPERACIONES CRUD:
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 1. GET api/personal.php                                                 │
+│    Método: getPersonal()                                                │
+│    Líneas: 1749, 2021, 2033, 2436, 3080, 3094, 3460                    │
+│    Propósito: Obtener listado completo de personal                      │
+│    Usado en: initPersonalModule, handlePersonalFormSubmit,              │
+│              initVehiculoModule, initVisitasModule                      │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 2. GET api/personal.php?status=inside                                   │
+│    Método: getInsidePersonal()                                          │
+│    Propósito: Obtener personal que está dentro del recinto             │
+│    Uso: Dashboard, reportes                                             │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 3. POST api/personal.php                                                │
+│    Método: createPersonal(data)                                         │
+│    Línea: 2017                                                          │
+│    Función: handlePersonalFormSubmit()                                  │
+│    Parámetros: { NrRut, Nombres, Paterno, Materno, Grado, ... }        │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 4. PUT api/personal.php                                                 │
+│    Método: updatePersonal(data)                                         │
+│    Línea: 2014                                                          │
+│    Función: handlePersonalFormSubmit()                                  │
+│    Parámetros: { id, NrRut, Nombres, Paterno, Materno, Grado, ... }    │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 5. DELETE api/personal.php?id={id}                                      │
+│    Método: deletePersonal(id)                                           │
+│    Línea: 2031                                                          │
+│    Función: handleDeletePersonal()                                      │
+└─────────────────────────────────────────────────────────────────────────┘
+
+BÚSQUEDA Y CONSULTAS:
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 6. GET api/personal.php?rut={rut}                                       │
+│    Método: findPersonalByRut(rut)                                       │
+│    Líneas: 322, 335, 403, 3872                                          │
+│    Funciones: handleRutLookup(), initHorasExtraModule(),                │
+│               searchEmpresaRepresentante()                              │
+│    Propósito: Buscar persona por RUT sin dígito verificador            │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 7. GET api/personal.php?search={query}&tipo={tipo}                      │
+│    Método: searchPersonal(query, tipo)                                  │
+│    Líneas: 335, 2233                                                    │
+│    Funciones: handleRutLookup(), handlePersonalSearch()                 │
+│    Parámetros: query (nombre o RUT), tipo (FUNCIONARIO, RESIDENTE, etc)│
+└─────────────────────────────────────────────────────────────────────────┘
+
+================================================================================
+2. LLAMADAS A api/vehiculos.php
+================================================================================
+
+OPERACIONES CRUD:
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 1. GET api/vehiculos.php                                                │
+│    Método: getVehiculos()                                               │
+│    Líneas: 2436, 2906, 3076, 3080, 3094                                │
+│    Propósito: Obtener listado completo de vehículos                     │
+│    Usado en: initVehiculoModule, después de CRUD operations            │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 2. POST api/vehiculos.php                                               │
+│    Método: createVehiculo(data)                                         │
+│    Líneas: 2874, 3078                                                   │
+│    Funciones: handleVehiculoAsociadoSubmit(), handleVehiculoFormSubmit()│
+│    Parámetros: { patente, marca, modelo, color, tipo, asociado_id,     │
+│                  asociado_tipo, seguro_vencimiento, ... }               │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 3. PUT api/vehiculos.php                                                │
+│    Método: updateVehiculo(data)                                         │
+│    Línea: 3074                                                          │
+│    Función: handleVehiculoFormSubmit()                                  │
+│    Parámetros: { id, patente, marca, modelo, color, tipo, ... }        │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 4. DELETE api/vehiculos.php?id={id}                                     │
+│    Método: deleteVehiculo(id)                                           │
+│    Línea: 3092                                                          │
+│    Función: handleDeleteVehiculo()                                      │
+└─────────────────────────────────────────────────────────────────────────┘
+
+HISTORIAL:
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 5. GET api/vehiculo_historial.php?vehiculo_id={id}                      │
+│    Método: getVehiculoHistorial(id)                                     │
+│    Línea: 3136                                                          │
+│    Función: openHistorialModal()                                        │
+│    Propósito: Obtener historial de cambios del vehículo                │
+└─────────────────────────────────────────────────────────────────────────┘
+
+================================================================================
+3. LLAMADAS A api/visitas.php
+================================================================================
+
+OPERACIONES CRUD:
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 1. GET api/visitas.php                                                  │
+│    Método: getVisitas()                                                 │
+│    Líneas: 3520, 3655, 3667, 3682                                      │
+│    Propósito: Obtener listado completo de visitas                       │
+│    Usado en: initVisitasModule, después de operaciones CRUD            │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 2. POST api/visitas.php                                                 │
+│    Método: createVisita(data)                                           │
+│    Línea: 3651                                                          │
+│    Función: handleVisitaFormSubmit()                                    │
+│    Parámetros: { rut, nombres, apellidos, empresa, motivo_visita,      │
+│                  fecha_inicio, fecha_fin, ... }                         │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 3. PUT api/visitas.php                                                  │
+│    Método: updateVisita(data)                                           │
+│    Línea: 3648                                                          │
+│    Función: handleVisitaFormSubmit()                                    │
+│    Parámetros: { id, rut, nombres, apellidos, empresa, ... }           │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 4. DELETE api/visitas.php?id={id}                                       │
+│    Método: deleteVisita(id)                                             │
+│    Línea: 3665                                                          │
+│    Función: handleDeleteVisita()                                        │
+└─────────────────────────────────────────────────────────────────────────┘
+
+LISTA NEGRA:
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 5. PUT api/visitas.php?id={id}                                          │
+│    Método: toggleBlacklistVisita(id, status)                            │
+│    Línea: 3680                                                          │
+│    Función: handleToggleBlacklist()                                     │
+│    Parámetros: { en_lista_negra: 0/1 }                                 │
+│    Propósito: Agregar/quitar visita de lista negra                     │
+└─────────────────────────────────────────────────────────────────────────┘
+
+================================================================================
+4. LLAMADAS A api/horas_extra.php
+================================================================================
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 1. GET api/horas_extra.php                                              │
+│    Método: getHorasExtra()                                              │
+│    Línea: 239                                                           │
+│    Función: loadAndRenderHorasExtraHistory()                            │
+│    Propósito: Obtener historial de horas extra                         │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 2. POST api/horas_extra.php                                             │
+│    Método: createHorasExtra(data)                                       │
+│    Línea: 481                                                           │
+│    Función: handleHorasExtraSubmit()                                    │
+│    Parámetros: { personal: [{rut, nombre}], fecha_hora_termino,        │
+│                  motivo, motivo_detalle, autorizado_por_rut,            │
+│                  autorizado_por_nombre }                                │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 3. PUT api/horas_extra.php                                              │
+│    Método: updateHorasExtra(data)                                       │
+│    Propósito: Actualizar registro de horas extra                       │
+│    Nota: Definido en api.js pero NO usado en main.js                   │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 4. DELETE api/horas_extra.php?id={id}                                   │
+│    Método: deleteHorasExtra(id)                                         │
+│    Línea: 294                                                           │
+│    Función: handleDeleteHorasExtra()                                    │
+└─────────────────────────────────────────────────────────────────────────┘
+
+================================================================================
+5. LLAMADAS A api/portico.php Y api/log_access.php
+================================================================================
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 1. GET api/log_access.php?type={type}                                   │
+│    Método: getAccessLogs(type)                                          │
+│    Líneas: 505-509 (5 tipos), 600-604 (5 tipos), 2045, 3352, 3694      │
+│    Funciones: loadAndRenderPorticoLogs(), refreshPortico(),             │
+│               initControlPersonalModule(), initControlVehiculoModule(), │
+│               initControlVisitasModule()                                │
+│    Parámetros type: 'personal', 'vehiculo', 'visita',                  │
+│                     'personal_comision', 'empresa_empleado'             │
+│    Propósito: Obtener logs de acceso por tipo                          │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 2. POST api/log_access.php                                              │
+│    Método: logAccess(targetId, targetType, puntoAcceso)                 │
+│    Líneas: 2058, 3365, 3707                                             │
+│    Funciones: handleScanControlPersonalSubmit(),                        │
+│               handleScanControlVehiculoSubmit(),                        │
+│               handleScanControlVisitaSubmit()                           │
+│    Parámetros: { target_id, target_type, punto_acceso }                │
+│    Propósito: Registrar acceso manual desde módulos de control         │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 3. POST api/portico.php                                                 │
+│    Método: logPorticoAccess(id)                                         │
+│    Línea: 552                                                           │
+│    Función: handleScanPorticoSubmit()                                   │
+│    Parámetros: { id }                                                   │
+│    Propósito: Registrar acceso desde pórtico (inteligente)             │
+│    Respuesta: { action: 'entrada'/'salida'/'clarification_required',   │
+│                 message, type, name, ... }                              │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 4. POST api/log_clarified_access.php                                    │
+│    Método: logClarifiedAccess(data)                                     │
+│    Línea: 920                                                           │
+│    Función: showClarificationModal() callback                           │
+│    Parámetros: { person_id, reason, details }                          │
+│    Propósito: Registrar acceso con aclaración de funcionario           │
+└─────────────────────────────────────────────────────────────────────────┘
+
+================================================================================
+6. LLAMADAS A api/comision.php
+================================================================================
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 1. GET api/comision.php                                                 │
+│    Método: getComision()                                                │
+│    Líneas: 1815, 1910, 1922                                            │
+│    Propósito: Obtener personal en comisión                              │
+│    Usado en: initComisionModule, después de CRUD                        │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 2. POST api/comision.php                                                │
+│    Método: createComision(data)                                         │
+│    Línea: 1906                                                          │
+│    Función: handleComisionFormSubmit()                                  │
+│    Parámetros: { rut_comision, nombres, grado, unidad, destino,        │
+│                  fecha_salida, fecha_regreso, observaciones }           │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 3. PUT api/comision.php                                                 │
+│    Método: updateComision(data)                                         │
+│    Línea: 1903                                                          │
+│    Función: handleComisionFormSubmit()                                  │
+│    Parámetros: { id, rut_comision, nombres, grado, ... }               │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 4. DELETE api/comision.php?id={id}                                      │
+│    Método: deleteComision(id)                                           │
+│    Línea: 1920                                                          │
+│    Función: handleDeleteComision()                                      │
+└─────────────────────────────────────────────────────────────────────────┘
+
+================================================================================
+7. LLAMADAS A api/empresas.php
+================================================================================
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 1. GET api/empresas.php                                                 │
+│    Método: getEmpresas()                                                │
+│    Línea: 3802                                                          │
+│    Función: initEmpresasModule()                                        │
+│    Propósito: Obtener listado de empresas                               │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 2. POST api/empresas.php                                                │
+│    Método: createEmpresa(data)                                          │
+│    Línea: 3854                                                          │
+│    Función: handleEmpresaFormSubmit()                                   │
+│    Parámetros: { nombre, rut, rubro, contacto_nombre, ... }            │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 3. PUT api/empresas.php                                                 │
+│    Método: updateEmpresa(data)                                          │
+│    Línea: 3852                                                          │
+│    Función: handleEmpresaFormSubmit()                                   │
+│    Parámetros: { id, nombre, rut, rubro, ... }                         │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 4. DELETE api/empresas.php?id={id}                                      │
+│    Método: deleteEmpresa(id)                                            │
+│    Línea: 3968                                                          │
+│    Función: Event listener en tabla                                     │
+└─────────────────────────────────────────────────────────────────────────┘
+
+================================================================================
+8. LLAMADAS A api/empresa_empleados.php
+================================================================================
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 1. GET api/empresa_empleados.php?empresa_id={id}                        │
+│    Método: getEmpresaEmpleados(empresaId)                               │
+│    Línea: 3890                                                          │
+│    Función: showEmpleadosModal()                                        │
+│    Propósito: Obtener empleados de una empresa específica              │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 2. POST api/empresa_empleados.php                                       │
+│    Método: createEmpresaEmpleado(data)                                  │
+│    Línea: 3946                                                          │
+│    Función: handleEmpleadoFormSubmit()                                  │
+│    Parámetros: { empresa_id, rut, nombres, apellidos, cargo, ... }     │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 3. PUT api/empresa_empleados.php                                        │
+│    Método: updateEmpresaEmpleado(data)                                  │
+│    Línea: 3944                                                          │
+│    Función: handleEmpleadoFormSubmit()                                  │
+│    Parámetros: { id, empresa_id, rut, nombres, apellidos, cargo, ... } │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 4. DELETE api/empresa_empleados.php?id={id}                             │
+│    Método: deleteEmpresaEmpleado(id)                                    │
+│    Línea: 4007                                                          │
+│    Función: Event listener en tabla de empleados                        │
+└─────────────────────────────────────────────────────────────────────────┘
+
+================================================================================
+9. LLAMADAS A api/dashboard.php
+================================================================================
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 1. GET api/dashboard.php                                                │
+│    Método: getDashboardData()                                           │
+│    Líneas: 1373, 1385                                                   │
+│    Funciones: refreshDashboard(), initDashboardModule()                 │
+│    Propósito: Obtener datos agregados del dashboard                    │
+│    Respuesta: { personal_adentro, vehiculos_adentro, alertas, ... }    │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 2. GET api/dashboard.php?category={category}                            │
+│    Método: getDashboardDetails(category)                                │
+│    Línea: 1573                                                          │
+│    Función: openDashboardDetailModal()                                  │
+│    Parámetros: category (personal_adentro, vehiculos_adentro, etc)     │
+│    Propósito: Obtener detalles de una categoría específica             │
+└─────────────────────────────────────────────────────────────────────────┘
+
+================================================================================
+10. LLAMADAS A api/reportes.php
+================================================================================
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 1. GET api/reportes.php?{filters}                                       │
+│    Método: getReport(filters)                                           │
+│    Propósito: Generar reportes con filtros                              │
+│    Parámetros: { fecha_inicio, fecha_fin, tipo_reporte, formato, ... } │
+│    Nota: Definido en api.js pero llamado desde reportes.js             │
+└─────────────────────────────────────────────────────────────────────────┘
+
+================================================================================
+11. LLAMADAS A api/auth.php Y api/users.php
+================================================================================
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 1. POST api/auth.php                                                    │
+│    Método: loginUser(username, password)                                │
+│    Propósito: Autenticación de usuarios                                 │
+│    Parámetros: { username, password }                                   │
+│    Nota: Usado en login.js, no en main.js                              │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 2-5. api/users.php (CRUD completo)                                      │
+│    Métodos: getUsers(), createUser(), updateUser(), deleteUser()        │
+│    Propósito: Gestión de usuarios del sistema                           │
+│    Nota: Definidos en api.js pero NO implementado UI en main.js        │
+└─────────────────────────────────────────────────────────────────────────┘
+
+================================================================================
+PATRONES IDENTIFICADOS
+================================================================================
+
+1. PATRÓN DE RECARGA DESPUÉS DE CRUD:
+   Después de CREATE/UPDATE/DELETE, se recarga inmediatamente la lista:
+   
+   await api.createVehiculo(data);
+   vehiculosData = await api.getVehiculos(); // ← Recarga inmediata
+   
+   Ocurre en: Personal, Vehículos, Visitas, Comisión, Empresas
+
+2. PATRÓN DE BÚSQUEDA POR RUT:
+   Se usa findPersonalByRut() en múltiples módulos:
+   - Horas Extra (validación de autorización)
+   - Empresas (búsqueda de representante)
+   - Vehículos (asociación con propietario)
+   
+3. PATRÓN DE LOGS DE ACCESO:
+   getAccessLogs(type) se llama 5 veces en paralelo para el pórtico:
+   
+   await Promise.all([
+       api.getAccessLogs('personal'),
+       api.getAccessLogs('vehiculo'),
+       api.getAccessLogs('visita'),
+       api.getAccessLogs('personal_comision'),
+       api.getAccessLogs('empresa_empleado')
+   ]);
+
+4. PATRÓN DE PROMISE.ALL:
+   Se cargan múltiples recursos en paralelo:
+   
+   [vehiculosData, personalData] = await Promise.all([
+       api.getVehiculos(), 
+       api.getPersonal()
+   ]);
+
+================================================================================
+RECOMENDACIONES PARA FASE 2
+================================================================================
+
+CREAR LOS SIGUIENTES MÓDULOS API:
+
+1. js/api/personal-api.js (PRIORIDAD ALTA)
+   Métodos:
+   - getAll()
+   - getInsideOnly()
+   - getById(id)
+   - getByRut(rut)
+   - search(query, tipo)
+   - create(data)
+   - update(data)
+   - delete(id)
+   
+2. js/api/vehiculos-api.js (PRIORIDAD ALTA)
+   Métodos:
+   - getAll()
+   - getById(id)
+   - getHistorial(vehiculoId)
+   - create(data)
+   - update(data)
+   - delete(id)
+
+3. js/api/visitas-api.js (PRIORIDAD ALTA)
+   Métodos:
+   - getAll()
+   - getById(id)
+   - create(data)
+   - update(data)
+   - delete(id)
+   - toggleBlacklist(id, status)
+
+4. js/api/access-logs-api.js (PRIORIDAD ALTA)
+   Métodos:
+   - getByType(type)
+   - getAllTypes() → Promise.all de todos los tipos
+   - logAccess(targetId, targetType, puntoAcceso)
+   - logPortico(id)
+   - logClarified(data)
+
+5. js/api/horas-extra-api.js (PRIORIDAD MEDIA)
+   Métodos:
+   - getAll()
+   - create(data)
+   - update(data)
+   - delete(id)
+
+6. js/api/comision-api.js (PRIORIDAD MEDIA)
+   Métodos:
+   - getAll()
+   - create(data)
+   - update(data)
+   - delete(id)
+
+7. js/api/empresas-api.js (PRIORIDAD MEDIA)
+   Métodos:
+   - getAll()
+   - getById(id)
+   - getEmpleados(empresaId)
+   - create(data)
+   - update(data)
+   - delete(id)
+   - createEmpleado(data)
+   - updateEmpleado(data)
+   - deleteEmpleado(id)
+
+8. js/api/dashboard-api.js (PRIORIDAD BAJA)
+   Métodos:
+   - getData()
+   - getDetails(category)
+
+9. js/api/reportes-api.js (PRIORIDAD BAJA)
+   Métodos:
+   - generate(filters)
+
+10. js/api/users-api.js (PRIORIDAD BAJA - Futuro)
+    Métodos:
+    - getAll()
+    - create(data)
+    - update(data)
+    - delete(id)
+
+================================================================================
+ESTRUCTURA RECOMENDADA PARA CADA MÓDULO API
+================================================================================
+
+Ejemplo: js/api/personal-api.js
+
+import ApiClient from './api-client.js';
+
+export class PersonalApi {
+    constructor() {
+        this.client = new ApiClient();
+        this.endpoint = 'personal.php';
+    }
+
+    async getAll() {
+        const result = await this.client.get(this.endpoint);
+        if (!result.success) throw new Error(result.error);
+        return result.data;
+    }
+
+    async getByRut(rut) {
+        const result = await this.client.get(this.endpoint, { rut });
+        if (!result.success) throw new Error(result.error);
+        return result.data;
+    }
+
+    async create(data) {
+        const result = await this.client.post(this.endpoint, data);
+        if (!result.success) throw new Error(result.error);
+        return result.data;
+    }
+
+    // ... más métodos
+}
+
+export default new PersonalApi();
+
+================================================================================
+PRÓXIMO PASO
+================================================================================
+
+Una vez revisado este análisis, proceder a:
+
+OPCIÓN 1: Crear TODOS los módulos API de una vez (recomendado)
+OPCIÓN 2: Crear módulos API de PRIORIDAD ALTA primero (Personal, Vehículos, 
+          Visitas, AccessLogs)
+OPCIÓN 3: Crear un módulo completo como ejemplo y luego el resto
+
+¿Qué opción prefieres?
+
+================================================================================
+FIN DEL ANÁLISIS
+================================================================================

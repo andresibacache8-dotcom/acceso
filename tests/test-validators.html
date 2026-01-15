@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test - Validadores ES6 Modules</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .test-result { 
+            padding: 10px; 
+            margin: 5px 0; 
+            border-radius: 5px; 
+        }
+        .test-pass { background-color: #d4edda; color: #155724; }
+        .test-fail { background-color: #f8d7da; color: #721c24; }
+        .test-section { margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <div class="container mt-5">
+        <h1>🧪 Prueba de Concepto - Módulos ES6</h1>
+        <p class="lead">Validación de que los módulos <code>validators.js</code>, <code>formatters.js</code> y <code>date-utils.js</code> funcionan correctamente.</p>
+        
+        <hr>
+
+        <div class="test-section">
+            <h2>📋 Validadores de RUT</h2>
+            <div id="rut-tests"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>🚗 Validadores de Patente</h2>
+            <div id="patente-tests"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>📧 Validadores de Email</h2>
+            <div id="email-tests"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>📅 Utilidades de Fecha</h2>
+            <div id="fecha-tests"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>🎨 Formateadores</h2>
+            <div id="formatter-tests"></div>
+        </div>
+
+        <hr>
+        <div id="summary" class="alert alert-info"></div>
+    </div>
+
+    <script type="module">
+        import { validarRUT, limpiarRUT, validarPatenteChilena, validarEmail } from '../js/utils/validators.js';
+        import { formatearFecha, formatearMoneda, formatearNombreCompleto } from '../js/utils/formatters.js';
+        import { obtenerFechaActual, sumarDias, diferenciaEnDias, calcularEdad } from '../js/utils/date-utils.js';
+
+        let totalTests = 0;
+        let passedTests = 0;
+
+        function runTest(name, condition, container) {
+            totalTests++;
+            const result = document.createElement('div');
+            result.className = `test-result ${condition ? 'test-pass' : 'test-fail'}`;
+            result.innerHTML = `${condition ? '✅' : '❌'} <strong>Test ${totalTests}</strong> - ${name}`;
+            container.appendChild(result);
+            if (condition) passedTests++;
+        }
+
+        // ====================================================================
+        // TESTS DE RUT
+        // ====================================================================
+        const rutContainer = document.getElementById('rut-tests');
+        
+        runTest('RUT válido 8 dígitos: "12345678"', validarRUT('12345678'), rutContainer);
+        runTest('RUT válido 7 dígitos: "1234567"', validarRUT('1234567'), rutContainer);
+        runTest('RUT inválido (con DV): "12345678-5"', !validarRUT('12345678-5'), rutContainer);
+        runTest('RUT inválido (con puntos): "12.345.678"', !validarRUT('12.345.678'), rutContainer);
+        runTest('RUT inválido (muy corto): "123456"', !validarRUT('123456'), rutContainer);
+        runTest('RUT inválido (muy largo): "123456789"', !validarRUT('123456789'), rutContainer);
+        runTest('limpiarRUT limpia formato: "12.345.678-5"', limpiarRUT('12.345.678-5') === '123456785', rutContainer);
+
+        // ====================================================================
+        // TESTS DE PATENTE
+        // ====================================================================
+        const patenteContainer = document.getElementById('patente-tests');
+        
+        runTest('Patente antigua auto: "AA1234"', validarPatenteChilena('AA1234'), patenteContainer);
+        runTest('Patente nueva auto: "BCDF12"', validarPatenteChilena('BCDF12'), patenteContainer);
+        runTest('Patente inválida: "1234AB"', !validarPatenteChilena('1234AB'), patenteContainer);
+        runTest('Patente nueva moto: "BCD12"', validarPatenteChilena('BCD12'), patenteContainer);
+
+        // ====================================================================
+        // TESTS DE EMAIL
+        // ====================================================================
+        const emailContainer = document.getElementById('email-tests');
+        
+        runTest('Email válido: "test@example.com"', validarEmail('test@example.com'), emailContainer);
+        runTest('Email inválido: "invalido@"', !validarEmail('invalido@'), emailContainer);
+        runTest('Email inválido sin @', !validarEmail('testexample.com'), emailContainer);
+
+        // ====================================================================
+        // TESTS DE FECHA
+        // ====================================================================
+        const fechaContainer = document.getElementById('fecha-tests');
+        
+        const hoy = obtenerFechaActual();
+        runTest(`Fecha actual en formato ISO: "${hoy}"`, /^\d{4}-\d{2}-\d{2}$/.test(hoy), fechaContainer);
+        
+        const manana = sumarDias(new Date(), 1);
+        runTest('Sumar 1 día a hoy', manana.getDate() === new Date().getDate() + 1 || manana.getDate() === 1, fechaContainer);
+        
+        const diff = diferenciaEnDias('2025-10-01', '2025-10-24');
+        runTest('Diferencia entre 2025-10-01 y 2025-10-24 = 23 días', diff === 23, fechaContainer);
+
+        const edad = calcularEdad('1990-01-01');
+        runTest('Edad de alguien nacido en 1990-01-01', edad >= 35, fechaContainer);
+
+        // ====================================================================
+        // TESTS DE FORMATEADORES
+        // ====================================================================
+        const formatterContainer = document.getElementById('formatter-tests');
+        
+        const fechaFormateada = formatearFecha('2025-10-24');
+        runTest(`formatearFecha('2025-10-24') = "${fechaFormateada}"`, fechaFormateada === '24/10/2025', formatterContainer);
+        
+        const monedaFormateada = formatearMoneda(1234567);
+        runTest(`formatearMoneda(1234567) = "${monedaFormateada}"`, monedaFormateada === '$1.234.567', formatterContainer);
+        
+        const nombreCompleto = formatearNombreCompleto({ 
+            nombres: 'JUAN', 
+            paterno: 'PEREZ', 
+            materno: 'GONZALEZ', 
+            grado: 'CAPITAN' 
+        });
+        runTest(`formatearNombreCompleto() incluye grado`, nombreCompleto.includes('CAPITAN'), formatterContainer);
+
+        // ====================================================================
+        // RESUMEN
+        // ====================================================================
+        const summaryEl = document.getElementById('summary');
+        const percentage = ((passedTests / totalTests) * 100).toFixed(1);
+        summaryEl.innerHTML = `
+            <h3>📊 RESUMEN: ${passedTests === totalTests ? '✅' : '⚠️'} ${passedTests}/${totalTests} (${percentage}%)</h3>
+            <p><strong>Tests pasados:</strong> ${passedTests} | <strong>Tests fallidos:</strong> ${totalTests - passedTests}</p>
+        `;
+        summaryEl.className = `alert ${passedTests === totalTests ? 'alert-success' : 'alert-warning'}`;
+
+        // Log en consola para debugging
+        console.log(`%c✅ TESTS COMPLETADOS: ${passedTests}/${totalTests} (${percentage}%)`, 'color: green; font-weight: bold; font-size: 16px;');
+    </script>
+</body>
+</html>

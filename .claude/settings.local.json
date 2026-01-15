@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(php run_migration.php:*)",
+      "Bash(\"C:\\xampp\\htdocs\\Desarrollo\\acceso\\js\\api\\unidades-api.js\" )",
+      "Bash(\"C:\\xampp\\htdocs\\Desarrollo\\acceso\\js\\api\\subdepartamentos-api.js\" )",
+      "Bash(\"C:\\xampp\\htdocs\\Desarrollo\\acceso\\js\\modules\\unidades.js\" )",
+      "Bash(\"C:\\xampp\\htdocs\\Desarrollo\\acceso\\js\\modules\\subdepartamentos.js\" )",
+      "Bash(\"C:\\xampp\\htdocs\\Desarrollo\\acceso\\js\\ui\\templates-unidades.js\" )",
+      "Bash(\"C:\\xampp\\htdocs\\Desarrollo\\acceso\\js\\ui\\templates-subdepartamentos.js\" )",
+      "Bash(\"C:\\xampp\\htdocs\\Desarrollo\\acceso\\api\\unidades.php\" )",
+      "Bash(\"C:\\xampp\\htdocs\\Desarrollo\\acceso\\api\\subdepartamentos.php\" )",
+      "Bash(\"C:\\xampp\\htdocs\\Desarrollo\\acceso\\run_migrations.php\" )",
+      "Bash(\"C:\\xampp\\htdocs\\Desarrollo\\acceso\\api\\migrate.php\" )",
+      "Bash(\"C:\\xampp\\htdocs\\Desarrollo\\acceso\\sql\\unidades_table.sql\" )",
+      "Bash(\"C:\\xampp\\htdocs\\Desarrollo\\acceso\\sql\\subdepartamentos_table.sql\" )",
+      "Bash(\"C:\\xampp\\htdocs\\Desarrollo\\acceso\\database\\migrations\\001_create_unidades_table.sql\" )",
+      "Bash(\"C:\\xampp\\htdocs\\Desarrollo\\acceso\\database\\migrations\\002_create_subdepartamentos_table.sql\")"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

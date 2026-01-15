@@ -1,0 +1,212 @@
+================================================================================
+RESUMEN DE CAMBIOS - DESCARGA DE PLANTILLAS DE CARGA MASIVA DE VEHÍCULOS
+================================================================================
+
+PROBLEMA ORIGINAL:
+- El usuario reportó que al descargar la plantilla Excel del módulo de carga
+  masiva de vehículos, el navegador intentaba descargar un archivo que no
+  existía (templates/plantilla_vehiculos.xlsx)
+- Los botones de descarga no funcionaban
+
+SOLUCIÓN IMPLEMENTADA:
+- Se reemplazó la descarga de archivos estáticos con generación dinámica
+- Los archivos se crean en tiempo real usando JavaScript
+- Excel: Generado con librería XLSX (SheetJS)
+- CSV: Generado con Blob API
+
+================================================================================
+CAMBIOS EN ARCHIVO: js/modules/vehiculos.js
+================================================================================
+
+1. FUNCIÓN: openImportVehiculosModal() (líneas 575-651)
+   ────────────────────────────────────────────────────
+   CAMBIOS PRINCIPALES:
+
+   a) Reseteo de Modal Mejorado (líneas 591-612)
+      - Antes: Solo reseteaba 'vehiculos-csv-file'
+      - Ahora: Reseta 'vehiculos-excel-file' con validaciones null
+      - Añadidas validaciones para cada elemento DOM
+
+   b) Event Listener del Botón (líneas 615-620)
+      - Ahora valida que el botón existe antes de adjuntar listener
+
+   c) Event Listeners de Descargas (líneas 622-643)
+      - CAMBIO IMPORTANTE: Busca botones dentro del modal (importModalEl)
+      - Antes: document.querySelector()
+      - Ahora: importModalEl.querySelector()
+      - Añadido console.warn() si botones no se encuentran
+
+2. NUEVA FUNCIÓN: descargarPlantillaExcel() (líneas 650-688)
+   ──────────────────────────────────────────────────────────
+   PROPÓSITO: Generar dinámicamente plantilla Excel
+
+   ESTRUCTURA DEL ARCHIVO:
+   - Encabezados: patente, marca, modelo, tipo, tipo_vehiculo,
+                  personalNrRut, acceso_permanente, fecha_expiracion
+   - Filas ejemplo:
+     1. SD4115, TOYOTA, SANTA FE, VISITA, FURGON, 17964768, 0, 2025-12-31
+     2. AB1234, HONDA, CIVIC, FUNCIONARIO, AUTO, 12345678, 1, (vacío)
+     3. XY5678, FORD, FIESTA, EMPRESA, AUTO, 98765432, 0, 2025-11-15
+
+   CARACTERÍSTICAS:
+   - Valida que XLSX está disponible
+   - Ajusta ancho de columnas automáticamente
+   - Descarga con nombre: plantilla_vehiculos.xlsx
+   - Muestra notificación toast de éxito/error
+   - Try-catch para manejo de errores
+
+3. NUEVA FUNCIÓN: descargarPlantillaCsv() (líneas 694-723)
+   ───────────────────────────────────────────────────────
+   PROPÓSITO: Generar dinámicamente plantilla CSV
+
+   CARACTERÍSTICAS:
+   - Usa misma estructura que Excel
+   - Crea contenido CSV formato texto (separado por comas)
+   - Genera Blob para descarga
+   - Crea elemento <a> temporal para trigger de descarga
+   - Descarga con nombre: plantilla_vehiculos.csv
+   - Muestra notificación toast de éxito/error
+   - Limpia recursos después de descargar
+
+================================================================================
+VALIDACIONES Y MEJORAS
+================================================================================
+
+1. Null Safety
+   - Todas las referencias a elementos DOM ahora verifican existencia
+   - Evita "Cannot read properties of null" errors
+
+2. Error Handling
+   - Try-catch en ambas funciones de descarga
+   - Console.error para debugging
+   - Toast notifications para feedback al usuario
+
+3. Selector Improvement
+   - querySelector dentro de contexto correcto (importModalEl)
+   - Evita conflictos con otros elementos en la página
+
+================================================================================
+FLUJO DE EJECUCIÓN
+================================================================================
+
+PASO 1: Usuario hace clic en botón "Carga Masiva"
+   └─> se ejecuta evento click listener (línea 185)
+
+PASO 2: openImportVehiculosModal() se ejecuta (línea 575)
+   └─> crea div modal si no existe
+   └─> inyecta template HTML (línea 587)
+   └─> inicializa Bootstrap Modal
+   └─> adjunta event listener al botón "Iniciar Importación"
+   └─> BUSCA BOTONES DE DESCARGA (líneas 624-625)
+   └─> ADJUNTA EVENT LISTENERS A BOTONES (líneas 627-643)
+   └─> muestra el modal
+
+PASO 3: Usuario hace clic en "Descargar plantilla Excel"
+   └─> se previene comportamiento por defecto
+   └─> se ejecuta descargarPlantillaExcel()
+   └─> genera datos y encabezados
+   └─> crea hoja de cálculo XLSX
+   └─> descarga archivo
+   └─> muestra notificación
+
+PASO 4: Usuario hace clic en "Descargar plantilla CSV"
+   └─> se previene comportamiento por defecto
+   └─> se ejecuta descargarPlantillaCsv()
+   └─> genera contenido CSV
+   └─> crea Blob
+   └─> descarga archivo
+   └─> muestra notificación
+
+================================================================================
+REQUISITOS CUMPLIDOS
+================================================================================
+
+✓ Plantillas se generan dinámicamente (sin archivos estáticos requeridos)
+✓ Excel compatible con Microsoft Excel y LibreOffice
+✓ CSV abre en cualquier editor de texto
+✓ Datos de ejemplo con formatos correctos
+✓ Validaciones de errores
+✓ Notificaciones de éxito/error
+✓ Documentado con comentarios
+✓ Sin dependencias externas nuevas (XLSX ya estaba cargada)
+
+================================================================================
+ARCHIVOS INVOLUCRADOS
+================================================================================
+
+MODIFICADOS:
+  - C:\xampp\htdocs\Desarrollo\acceso\js\modules\vehiculos.js
+
+VERIFICADOS (NO MODIFICADOS):
+  - C:\xampp\htdocs\Desarrollo\acceso\index.html (XLSX cargada en línea 271)
+  - C:\xampp\htdocs\Desarrollo\acceso\js\ui\ui.js (template correcto)
+  - C:\xampp\htdocs\Desarrollo\acceso\js\xlsx.full.min.js (presente)
+
+================================================================================
+INSTRUCCIONES DE PRUEBA
+================================================================================
+
+1. ABRIR NAVEGADOR
+   - Acceder a la aplicación SCAD
+   - Hacer clic en sección "Vehículos"
+
+2. PROBAR CARGA MASIVA
+   - Hacer clic en botón "Carga Masiva"
+   - Debe abrirse modal de importación
+
+3. DESCARGAR PLANTILLA EXCEL
+   - Hacer clic en "Descargar plantilla Excel"
+   - Debe descargarse archivo plantilla_vehiculos.xlsx
+   - Debe aparecer notificación verde "Plantilla descargada correctamente"
+   - Abrir archivo en Excel/LibreOffice
+   - Verificar: encabezados y 3 filas de ejemplo
+
+4. DESCARGAR PLANTILLA CSV
+   - Hacer clic en "Descargar plantilla CSV"
+   - Debe descargarse archivo plantilla_vehiculos.csv
+   - Abrir con editor de texto
+   - Verificar: estructura CSV correcta
+
+5. VERIFICAR CONSOLA (F12)
+   - No debe haber errores críticos
+   - Si hay warnings, son informativos
+
+6. PROBAR IMPORTACIÓN
+   - Descargar plantilla Excel
+   - Importar sin cambios
+   - Verificar que se importan 3 vehículos correctamente
+
+================================================================================
+RESOLUCIÓN DE PROBLEMAS
+================================================================================
+
+PROBLEMA: "No funciona la descarga"
+SOLUCIÓN:
+  - Abrir F12 (Developer Tools)
+  - Ir a Console
+  - Buscar mensajes de error
+  - Verificar: console.log("descargarExcelBtn:", descargarExcelBtn)
+
+PROBLEMA: "Error al descargar la plantilla"
+SOLUCIÓN:
+  - Verificar que XLSX está disponible: console.log(typeof XLSX)
+  - Debe mostrar "object" si está cargado
+  - Si muestra "undefined", recargar página
+
+PROBLEMA: "Plantilla no se abre en Excel"
+SOLUCIÓN:
+  - Que la extensión sea .xlsx (no .xlsx.txt)
+  - Windows: Revisar Descargas, puede estar comprimido
+  - Verificar que no hay caracteres especiales en ruta
+
+================================================================================
+ESTADO FINAL
+================================================================================
+
+✓ Implementación completada
+✓ Código revisado y optimizado
+✓ Validaciones agregadas
+✓ Documentación completa
+✓ Listo para prueba por usuario
+
+================================================================================

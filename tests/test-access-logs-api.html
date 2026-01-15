@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test - Access Logs API Module</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        h1 {
+            color: #2d3748;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        
+        .subtitle {
+            color: #718096;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .test-item {
+            background: #f7fafc;
+            border-left: 4px solid #cbd5e0;
+            padding: 15px;
+            margin-bottom: 12px;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+        }
+        
+        .test-item.running {
+            border-left-color: #4299e1;
+            background: #ebf8ff;
+        }
+        
+        .test-item.passed {
+            border-left-color: #48bb78;
+            background: #f0fff4;
+        }
+        
+        .test-item.failed {
+            border-left-color: #f56565;
+            background: #fff5f5;
+        }
+        
+        .test-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 5px;
+        }
+        
+        .test-status {
+            font-size: 20px;
+            min-width: 24px;
+        }
+        
+        .test-title {
+            font-weight: 600;
+            color: #2d3748;
+            flex: 1;
+        }
+        
+        .test-time {
+            font-size: 12px;
+            color: #a0aec0;
+        }
+        
+        .test-description {
+            color: #4a5568;
+            font-size: 13px;
+            margin-left: 34px;
+            margin-bottom: 8px;
+        }
+        
+        .test-result {
+            margin-left: 34px;
+            font-size: 13px;
+            color: #2d3748;
+            padding: 8px 12px;
+            background: white;
+            border-radius: 4px;
+            border: 1px solid #e2e8f0;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .summary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 30px;
+            display: none;
+        }
+        
+        .summary.show {
+            display: block;
+        }
+        
+        .summary h2 {
+            margin-bottom: 15px;
+            font-size: 20px;
+        }
+        
+        .summary-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .stat-card {
+            background: rgba(255,255,255,0.2);
+            padding: 12px;
+            border-radius: 6px;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+        
+        .info-box {
+            background: #edf2f7;
+            border-left: 4px solid #4299e1;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 6px;
+        }
+        
+        .info-box h3 {
+            color: #2d3748;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+        
+        .info-box ul {
+            margin-left: 20px;
+            color: #4a5568;
+            font-size: 14px;
+            line-height: 1.8;
+        }
+        
+        .info-box code {
+            background: #e2e8f0;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .running .test-status {
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Access Logs API - Test Suite</h1>
+        <p class="subtitle">Testing js/api/access-logs-api.js module integration</p>
+        
+        <div id="test-results"></div>
+        
+        <div id="summary" class="summary">
+            <h2>📋 Resultados de Tests</h2>
+            <div class="summary-stats">
+                <div class="stat-card">
+                    <div class="stat-value" id="total-tests">0</div>
+                    <div class="stat-label">Total Tests</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="passed-tests">0</div>
+                    <div class="stat-label">Passed</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="failed-tests">0</div>
+                    <div class="stat-label">Failed</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="duration">0ms</div>
+                    <div class="stat-label">Duration</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="info-box">
+            <h3>ℹ️ Información del Test</h3>
+            <p><strong>Módulo testeado:</strong> <code>js/api/access-logs-api.js</code></p>
+            <br>
+            <p><strong>Métodos validados:</strong></p>
+            <ul>
+                <li><code>accessLogsApi.getByType(type)</code> - Obtener logs por tipo</li>
+                <li><code>accessLogsApi.getAllTypes()</code> - Obtener todos los logs en paralelo</li>
+                <li><code>accessLogsApi.logManual(id, type, punto)</code> - Registrar acceso manual</li>
+                <li><code>accessLogsApi.logPortico(id)</code> - Acceso inteligente por pórtico</li>
+                <li><code>accessLogsApi.logClarified(data)</code> - Acceso con aclaración</li>
+                <li><code>accessLogsApi.getAllCombined()</code> - Logs combinados ordenados</li>
+            </ul>
+            <br>
+            <p style="color: #e53e3e; font-weight: 600;">⚠️ Nota: Estos tests requieren que el servidor esté corriendo y la sesión esté activa.</p>
+        </div>
+    </div>
+
+    <script type="module">
+        import accessLogsApi from './js/api/access-logs-api.js';
+
+        // Test framework
+        class TestRunner {
+            constructor() {
+                this.tests = [];
+                this.results = [];
+                this.container = document.getElementById('test-results');
+                this.startTime = 0;
+            }
+
+            test(name, description, fn) {
+                this.tests.push({ name, description, fn });
+            }
+
+            async run() {
+                this.startTime = performance.now();
+                
+                for (const test of this.tests) {
+                    const testEl = this.createTestElement(test);
+                    this.container.appendChild(testEl);
+                    
+                    const result = await this.runTest(test, testEl);
+                    this.results.push(result);
+                }
+                
+                this.showSummary();
+            }
+
+            createTestElement(test) {
+                const div = document.createElement('div');
+                div.className = 'test-item running';
+                div.innerHTML = `
+                    <div class="test-header">
+                        <span class="test-status">⏳</span>
+                        <span class="test-title">${test.name}</span>
+                        <span class="test-time"></span>
+                    </div>
+                    <div class="test-description">${test.description}</div>
+                `;
+                return div;
+            }
+
+            async runTest(test, element) {
+                const startTime = performance.now();
+                
+                try {
+                    const result = await test.fn();
+                    const duration = Math.round(performance.now() - startTime);
+                    
+                    element.classList.remove('running');
+                    element.classList.add('passed');
+                    element.querySelector('.test-status').textContent = '✅';
+                    element.querySelector('.test-time').textContent = `Passed (${duration}ms)`;
+                    
+                    if (result) {
+                        const resultDiv = document.createElement('div');
+                        resultDiv.className = 'test-result';
+                        resultDiv.textContent = result;
+                        element.appendChild(resultDiv);
+                    }
+                    
+                    return { name: test.name, status: 'passed', duration };
+                } catch (error) {
+                    const duration = Math.round(performance.now() - startTime);
+                    
+                    element.classList.remove('running');
+                    element.classList.add('failed');
+                    element.querySelector('.test-status').textContent = '❌';
+                    element.querySelector('.test-time').textContent = `Failed (${duration}ms)`;
+                    
+                    const resultDiv = document.createElement('div');
+                    resultDiv.className = 'test-result';
+                    resultDiv.textContent = `❌ Error: ${error.message}`;
+                    resultDiv.style.color = '#e53e3e';
+                    element.appendChild(resultDiv);
+                    
+                    return { name: test.name, status: 'failed', duration, error: error.message };
+                }
+            }
+
+            showSummary() {
+                const duration = Math.round(performance.now() - this.startTime);
+                const passed = this.results.filter(r => r.status === 'passed').length;
+                const failed = this.results.filter(r => r.status === 'failed').length;
+                
+                document.getElementById('total-tests').textContent = this.results.length;
+                document.getElementById('passed-tests').textContent = passed;
+                document.getElementById('failed-tests').textContent = failed;
+                document.getElementById('duration').textContent = `${duration}ms`;
+                
+                document.getElementById('summary').classList.add('show');
+            }
+        }
+
+        // Create test runner
+        const runner = new TestRunner();
+
+        // ========================================================================
+        // TEST 1: Verificar que el módulo se importó correctamente
+        // ========================================================================
+        runner.test(
+            'Import del módulo accessLogsApi',
+            'Verificar que el módulo se importó correctamente',
+            async () => {
+                if (!accessLogsApi) {
+                    throw new Error('El módulo accessLogsApi no se importó correctamente');
+                }
+                return 'Módulo importado correctamente';
+            }
+        );
+
+        // ========================================================================
+        // TEST 2-7: Verificar que los métodos existen
+        // ========================================================================
+        runner.test(
+            'Método getByType() existe',
+            'Verificar que el método getByType está disponible',
+            async () => {
+                if (typeof accessLogsApi.getByType !== 'function') {
+                    throw new Error('El método getByType() no existe');
+                }
+                return 'Método getByType() encontrado';
+            }
+        );
+
+        runner.test(
+            'Método getAllTypes() existe',
+            'Verificar que el método getAllTypes está disponible',
+            async () => {
+                if (typeof accessLogsApi.getAllTypes !== 'function') {
+                    throw new Error('El método getAllTypes() no existe');
+                }
+                return 'Método getAllTypes() encontrado';
+            }
+        );
+
+        runner.test(
+            'Método logManual() existe',
+            'Verificar que el método logManual está disponible',
+            async () => {
+                if (typeof accessLogsApi.logManual !== 'function') {
+                    throw new Error('El método logManual() no existe');
+                }
+                return 'Método logManual() encontrado';
+            }
+        );
+
+        runner.test(
+            'Método logPortico() existe',
+            'Verificar que el método logPortico está disponible',
+            async () => {
+                if (typeof accessLogsApi.logPortico !== 'function') {
+                    throw new Error('El método logPortico() no existe');
+                }
+                return 'Método logPortico() encontrado';
+            }
+        );
+
+        runner.test(
+            'Método logClarified() existe',
+            'Verificar que el método logClarified está disponible',
+            async () => {
+                if (typeof accessLogsApi.logClarified !== 'function') {
+                    throw new Error('El método logClarified() no existe');
+                }
+                return 'Método logClarified() encontrado';
+            }
+        );
+
+        runner.test(
+            'Método getAllCombined() existe',
+            'Verificar que el método getAllCombined está disponible',
+            async () => {
+                if (typeof accessLogsApi.getAllCombined !== 'function') {
+                    throw new Error('El método getAllCombined() no existe');
+                }
+                return 'Método getAllCombined() encontrado';
+            }
+        );
+
+        // ========================================================================
+        // TEST 8: getByType() - Validación de tipo inválido
+        // ========================================================================
+        runner.test(
+            'getByType() - Validación de tipo inválido',
+            'Verificar que getByType() rechaza tipos no válidos',
+            async () => {
+                try {
+                    await accessLogsApi.getByType('tipo_invalido');
+                    throw new Error('Debería haber lanzado error para tipo inválido');
+                } catch (error) {
+                    if (error.message.includes('Tipo de target no válido') || 
+                        error.message.includes('tipos permitidos')) {
+                        return '✓ Validación de tipo funciona correctamente';
+                    }
+                    throw error;
+                }
+            }
+        );
+
+        // ========================================================================
+        // TEST 9: getByType() - Obtener logs de personal
+        // ========================================================================
+        runner.test(
+            'getByType(\'personal\') - Obtener logs de personal',
+            'Llamar al endpoint GET api/log_access.php?target_type=personal',
+            async () => {
+                const logs = await accessLogsApi.getByType('personal');
+                
+                if (!Array.isArray(logs)) {
+                    throw new Error('getByType() debe retornar un array');
+                }
+                
+                return `✓ Obtuvo ${logs.length} logs de personal`;
+            }
+        );
+
+        // ========================================================================
+        // TEST 10: getByType() - Obtener logs de vehiculo
+        // ========================================================================
+        runner.test(
+            'getByType(\'vehiculo\') - Obtener logs de vehículo',
+            'Llamar al endpoint GET api/log_access.php?target_type=vehiculo',
+            async () => {
+                const logs = await accessLogsApi.getByType('vehiculo');
+                
+                if (!Array.isArray(logs)) {
+                    throw new Error('getByType() debe retornar un array');
+                }
+                
+                return `✓ Obtuvo ${logs.length} logs de vehículo`;
+            }
+        );
+
+        // ========================================================================
+        // TEST 11: getAllTypes() - Obtener todos los logs en paralelo
+        // ========================================================================
+        runner.test(
+            'getAllTypes() - Obtener todos los logs en paralelo',
+            'Ejecutar Promise.all con los 5 tipos de logs',
+            async () => {
+                const allLogs = await accessLogsApi.getAllTypes();
+                
+                if (!allLogs || typeof allLogs !== 'object') {
+                    throw new Error('getAllTypes() debe retornar un objeto');
+                }
+                
+                const expectedKeys = ['personal', 'vehiculo', 'visita', 'personal_comision', 'empresa_empleado'];
+                for (const key of expectedKeys) {
+                    if (!Array.isArray(allLogs[key])) {
+                        throw new Error(`getAllTypes().${key} debe ser un array`);
+                    }
+                }
+                
+                const totalLogs = Object.values(allLogs).reduce((sum, arr) => sum + arr.length, 0);
+                return `✓ Obtuvo logs de 5 tipos (${totalLogs} registros totales)`;
+            }
+        );
+
+        // ========================================================================
+        // TEST 12: getAllCombined() - Logs combinados y ordenados
+        // ========================================================================
+        runner.test(
+            'getAllCombined() - Logs combinados y ordenados',
+            'Verificar que combina y ordena los logs por fecha',
+            async () => {
+                const combined = await accessLogsApi.getAllCombined();
+                
+                if (!Array.isArray(combined)) {
+                    throw new Error('getAllCombined() debe retornar un array');
+                }
+                
+                // Verificar orden descendente
+                for (let i = 1; i < Math.min(combined.length, 5); i++) {
+                    const current = new Date(combined[i].log_time);
+                    const previous = new Date(combined[i-1].log_time);
+                    if (current > previous) {
+                        throw new Error('Los logs no están ordenados correctamente (debe ser DESC)');
+                    }
+                }
+                
+                return `✓ Obtuvo ${combined.length} logs combinados y ordenados`;
+            }
+        );
+
+        // ========================================================================
+        // TEST 13: logManual() - Validación de campos
+        // ========================================================================
+        runner.test(
+            'logManual() - Validación de tipo inválido',
+            'Verificar que logManual() valida el tipo de target',
+            async () => {
+                try {
+                    await accessLogsApi.logManual(123, 'tipo_invalido', 'oficina');
+                    throw new Error('Debería haber lanzado error para tipo inválido');
+                } catch (error) {
+                    if (error.message.includes('Tipo de target no válido')) {
+                        return '✓ Validación de tipo funciona correctamente';
+                    }
+                    throw error;
+                }
+            }
+        );
+
+        // ========================================================================
+        // TEST 14: logClarified() - Validación de campos obligatorios
+        // ========================================================================
+        runner.test(
+            'logClarified() - Validación de campos obligatorios',
+            'Verificar que logClarified() valida person_id y reason',
+            async () => {
+                let errors = [];
+                
+                // Test sin person_id
+                try {
+                    await accessLogsApi.logClarified({ reason: 'servicio' });
+                    errors.push('No validó person_id');
+                } catch (error) {
+                    if (!error.message.includes('person_id')) {
+                        errors.push('Error incorrecto para person_id');
+                    }
+                }
+                
+                // Test sin reason
+                try {
+                    await accessLogsApi.logClarified({ person_id: 123 });
+                    errors.push('No validó reason');
+                } catch (error) {
+                    if (!error.message.includes('reason')) {
+                        errors.push('Error incorrecto para reason');
+                    }
+                }
+                
+                if (errors.length > 0) {
+                    throw new Error(errors.join(', '));
+                }
+                
+                return '✓ Validación de campos obligatorios funciona';
+            }
+        );
+
+        // ========================================================================
+        // TEST 15: Estructura de endpoints correcta
+        // ========================================================================
+        runner.test(
+            'Estructura de endpoints correcta',
+            'Verificar configuración de endpoints',
+            async () => {
+                const client = accessLogsApi.client;
+                if (!client) {
+                    throw new Error('El cliente API no está configurado');
+                }
+                
+                const expectedEndpoints = ['log_access.php', 'portico.php', 'log_clarified_access.php'];
+                const actualEndpoints = [
+                    accessLogsApi.endpoint,
+                    accessLogsApi.porticoEndpoint,
+                    accessLogsApi.clarifiedEndpoint
+                ];
+                
+                for (let i = 0; i < expectedEndpoints.length; i++) {
+                    if (actualEndpoints[i] !== expectedEndpoints[i]) {
+                        throw new Error(`Endpoint ${i+1} incorrecto: esperado=${expectedEndpoints[i]}, actual=${actualEndpoints[i]}`);
+                    }
+                }
+                
+                return '✓ Endpoints configurados correctamente';
+            }
+        );
+
+        // ========================================================================
+        // RUN ALL TESTS
+        // ========================================================================
+        runner.run();
+    </script>
+</body>
+</html>

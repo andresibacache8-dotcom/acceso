@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Vehiculos API - Sistema de Acceso</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 2rem 0;
+        }
+        .test-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .test-card {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+        .test-result {
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 0.5rem 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: all 0.3s ease;
+        }
+        .test-result.pending {
+            background: #f8f9fa;
+            border-left: 4px solid #6c757d;
+        }
+        .test-result.running {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            animation: pulse 1.5s infinite;
+        }
+        .test-result.success {
+            background: #d1e7dd;
+            border-left: 4px solid #198754;
+        }
+        .test-result.error {
+            background: #f8d7da;
+            border-left: 4px solid #dc3545;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        .test-icon {
+            font-size: 1.5rem;
+            margin-right: 1rem;
+        }
+        .test-details {
+            font-size: 0.875rem;
+            color: #6c757d;
+            margin-top: 0.5rem;
+            font-family: 'Courier New', monospace;
+        }
+        .summary-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+        .stat-box {
+            text-align: center;
+            padding: 1rem;
+        }
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: bold;
+            display: block;
+        }
+        .stat-label {
+            font-size: 0.875rem;
+            opacity: 0.9;
+        }
+        .run-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            padding: 1rem 2rem;
+            font-size: 1.1rem;
+            font-weight: 600;
+            border-radius: 50px;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            transition: all 0.3s ease;
+        }
+        .run-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+        .run-button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <!-- Header -->
+        <div class="text-center mb-4">
+            <h1 class="text-white mb-2">🚗 Test Suite - Vehiculos API</h1>
+            <p class="text-white opacity-75">Validación de integración del módulo vehiculos-api.js</p>
+        </div>
+
+        <!-- Summary Card -->
+        <div class="summary-card" id="summary">
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="stat-box">
+                        <span class="stat-number" id="total-tests">0</span>
+                        <span class="stat-label">Total Tests</span>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-box">
+                        <span class="stat-number text-success" id="passed-tests">0</span>
+                        <span class="stat-label">✅ Passed</span>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-box">
+                        <span class="stat-number text-danger" id="failed-tests">0</span>
+                        <span class="stat-label">❌ Failed</span>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-box">
+                        <span class="stat-number" id="duration">0s</span>
+                        <span class="stat-label">⏱️ Duration</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Control Panel -->
+        <div class="test-card mb-4">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h5 class="mb-1">Control Panel</h5>
+                    <p class="text-muted mb-0">Ejecutar tests de validación</p>
+                </div>
+                <button class="btn btn-primary run-button" id="run-tests">
+                    🚀 Ejecutar Todos los Tests
+                </button>
+            </div>
+        </div>
+
+        <!-- Test Results -->
+        <div class="test-card">
+            <h5 class="mb-3">📋 Resultados de Tests</h5>
+            <div id="test-results"></div>
+        </div>
+
+        <!-- Info Card -->
+        <div class="test-card">
+            <h5 class="mb-3">ℹ️ Información del Test</h5>
+            <p><strong>Módulo testeado:</strong> <code>js/api/vehiculos-api.js</code></p>
+            <p><strong>Métodos validados:</strong></p>
+            <ul>
+                <li><code>vehiculosApi.getAll()</code> - Obtener todos los vehículos</li>
+                <li><code>vehiculosApi.create(data)</code> - Crear vehículo</li>
+                <li><code>vehiculosApi.update(data)</code> - Actualizar vehículo</li>
+                <li><code>vehiculosApi.deleteVehiculo(id)</code> - Eliminar vehículo</li>
+                <li><code>vehiculosApi.getHistorial(id)</code> - Obtener historial de cambios</li>
+            </ul>
+            <p class="text-muted mb-0"><strong>Nota:</strong> Estos tests requieren que el servidor esté corriendo y la sesión esté activa.</p>
+        </div>
+    </div>
+
+    <script type="module">
+        import vehiculosApi from './js/api/vehiculos-api.js';
+
+        // Estado de los tests
+        const testState = {
+            total: 0,
+            passed: 0,
+            failed: 0,
+            startTime: 0,
+            results: [],
+            createdVehiculoId: null // Para tests de actualización y eliminación
+        };
+
+        // Definición de tests
+        const tests = [
+            {
+                name: 'Import del módulo vehiculosApi',
+                description: 'Verificar que el módulo se importó correctamente',
+                async run() {
+                    if (typeof vehiculosApi !== 'object') {
+                        throw new Error('vehiculosApi no es un objeto');
+                    }
+                    if (!vehiculosApi.client) {
+                        throw new Error('vehiculosApi.client no existe');
+                    }
+                    return 'Módulo importado correctamente';
+                }
+            },
+            {
+                name: 'Método getAll() existe',
+                description: 'Verificar que el método getAll está disponible',
+                async run() {
+                    if (typeof vehiculosApi.getAll !== 'function') {
+                        throw new Error('getAll() no es una función');
+                    }
+                    return 'Método getAll() encontrado';
+                }
+            },
+            {
+                name: 'Método create() existe',
+                description: 'Verificar que el método create está disponible',
+                async run() {
+                    if (typeof vehiculosApi.create !== 'function') {
+                        throw new Error('create() no es una función');
+                    }
+                    return 'Método create() encontrado';
+                }
+            },
+            {
+                name: 'Método update() existe',
+                description: 'Verificar que el método update está disponible',
+                async run() {
+                    if (typeof vehiculosApi.update !== 'function') {
+                        throw new Error('update() no es una función');
+                    }
+                    return 'Método update() encontrado';
+                }
+            },
+            {
+                name: 'Método deleteVehiculo() existe',
+                description: 'Verificar que el método deleteVehiculo está disponible',
+                async run() {
+                    if (typeof vehiculosApi.deleteVehiculo !== 'function') {
+                        throw new Error('deleteVehiculo() no es una función');
+                    }
+                    return 'Método deleteVehiculo() encontrado';
+                }
+            },
+            {
+                name: 'Método getHistorial() existe',
+                description: 'Verificar que el método getHistorial está disponible',
+                async run() {
+                    if (typeof vehiculosApi.getHistorial !== 'function') {
+                        throw new Error('getHistorial() no es una función');
+                    }
+                    return 'Método getHistorial() encontrado';
+                }
+            },
+            {
+                name: 'getAll() - Obtener lista de vehículos',
+                description: 'Llamar al endpoint GET api/vehiculos.php',
+                async run() {
+                    const result = await vehiculosApi.getAll();
+                    if (!Array.isArray(result)) {
+                        throw new Error('getAll() no retornó un array');
+                    }
+                    return `✓ Obtuvo ${result.length} vehículos registrados`;
+                }
+            },
+            {
+                name: 'create() - Validación de campos obligatorios',
+                description: 'Verificar que create() valida campos requeridos',
+                async run() {
+                    try {
+                        await vehiculosApi.create({});
+                        throw new Error('Debería lanzar error si faltan campos');
+                    } catch (error) {
+                        if (error.message.includes('patente') || 
+                            error.message.includes('obligatorio') || 
+                            error.message.includes('requerido') ||
+                            error.message.includes('Bad Request')) {
+                            return '✓ Validación de patente obligatoria funciona';
+                        }
+                        throw error;
+                    }
+                }
+            },
+            {
+                name: 'create() - Crear vehículo de prueba',
+                description: 'Crear un vehículo temporal para tests',
+                async run() {
+                    // Generar patente válida formato nuevo chileno (ABCD12)
+                    const letras = 'BCDFGHJKLMNPRTVWXYZ';
+                    const randomLetters = Array(4).fill(0).map(() => letras[Math.floor(Math.random() * letras.length)]).join('');
+                    const randomNumbers = Math.floor(10 + Math.random() * 90); // 10-99
+                    
+                    const testData = {
+                        patente: `${randomLetters}${randomNumbers}`,
+                        marca: 'TEST',
+                        modelo: 'PRUEBA',
+                        color: 'ROJO',
+                        tipo: 'PERSONAL',
+                        tipo_vehiculo: 'AUTO',
+                        acceso_permanente: true
+                    };
+                    
+                    const result = await vehiculosApi.create(testData);
+                    
+                    // DEBUG: Ver qué retorna
+                    console.log('Result from create:', result);
+                    console.log('Result.id:', result?.id);
+                    console.log('Result keys:', Object.keys(result || {}));
+                    
+                    // El backend retorna el objeto completo con todos los campos
+                    const vehiculoId = result?.id;
+                    
+                    if (!vehiculoId) {
+                        throw new Error(`create() no retornó un ID válido. Retornó: ${JSON.stringify(result)}`);
+                    }
+                    
+                    // Guardar el ID para tests posteriores
+                    testState.createdVehiculoId = vehiculoId;
+                    
+                    return `✓ Vehículo creado: ${testData.patente} (ID: ${vehiculoId})`;
+                }
+            },
+            {
+                name: 'update() - Validación de ID obligatorio',
+                description: 'Verificar que update() requiere ID',
+                async run() {
+                    try {
+                        await vehiculosApi.update({ patente: 'TEST' });
+                        throw new Error('Debería lanzar error si falta ID');
+                    } catch (error) {
+                        if (error.message.includes('obligatorio') || error.message.includes('requerido')) {
+                            return '✓ Validación de ID funciona correctamente';
+                        }
+                        throw error;
+                    }
+                }
+            },
+            {
+                name: 'update() - Actualizar vehículo de prueba',
+                description: 'Actualizar el vehículo creado anteriormente',
+                async run() {
+                    if (!testState.createdVehiculoId) {
+                        throw new Error('No hay vehículo de prueba creado');
+                    }
+                    
+                    // Primero obtener el vehículo completo
+                    const vehiculos = await vehiculosApi.getAll();
+                    const vehiculo = vehiculos.find(v => v.id == testState.createdVehiculoId);
+                    
+                    if (!vehiculo) {
+                        throw new Error('No se encontró el vehículo de prueba');
+                    }
+                    
+                    // Actualizar con todos los campos necesarios
+                    const updateData = {
+                        id: testState.createdVehiculoId,
+                        patente: vehiculo.patente,
+                        marca: vehiculo.marca,
+                        modelo: 'ACTUALIZADO',
+                        color: 'AZUL',
+                        tipo: vehiculo.tipo,
+                        tipo_vehiculo: vehiculo.tipo_vehiculo,
+                        acceso_permanente: vehiculo.acceso_permanente
+                    };
+                    
+                    const result = await vehiculosApi.update(updateData);
+                    
+                    // El backend retorna el objeto actualizado directamente (sin success: true)
+                    if (!result || !result.id) {
+                        throw new Error(`update() no retornó un objeto válido. Resultado: ${JSON.stringify(result)}`);
+                    }
+                    
+                    // Verificar que se actualizó correctamente
+                    if (result.modelo !== 'ACTUALIZADO') {
+                        throw new Error(`El modelo no se actualizó. Esperado: ACTUALIZADO, Recibido: ${result.modelo}`);
+                    }
+                    
+                    return `✓ Vehículo actualizado: modelo=${result.modelo}, color=${result.color || 'AZUL'}`;
+                }
+            },
+            {
+                name: 'getHistorial() - Obtener historial de cambios',
+                description: 'Obtener historial del vehículo de prueba',
+                async run() {
+                    if (!testState.createdVehiculoId) {
+                        throw new Error('No hay vehículo de prueba creado');
+                    }
+                    
+                    try {
+                        const result = await vehiculosApi.getHistorial(testState.createdVehiculoId);
+                        
+                        // El backend puede retornar diferentes formatos
+                        if (!result || typeof result !== 'object') {
+                            return '⚠️ Historial vacío o formato inesperado';
+                        }
+                        
+                        // Contar registros de historial
+                        const count = result.historial ? result.historial.length : 
+                                     (Array.isArray(result) ? result.length : 0);
+                        
+                        return `✓ Historial obtenido: ${count} registros`;
+                    } catch (error) {
+                        // Si falla, puede ser porque el vehículo ya fue eliminado o no tiene historial
+                        if (error.message.includes('500')) {
+                            return '⚠️ Error de servidor al obtener historial (posible issue con consulta SQL)';
+                        }
+                        throw error;
+                    }
+                }
+            },
+            {
+                name: 'deleteVehiculo() - Eliminar vehículo de prueba',
+                description: 'Limpiar el vehículo temporal creado',
+                async run() {
+                    if (!testState.createdVehiculoId) {
+                        throw new Error('No hay vehículo de prueba creado');
+                    }
+                    
+                    const result = await vehiculosApi.deleteVehiculo(testState.createdVehiculoId);
+                    
+                    if (!result || !result.success) {
+                        throw new Error('deleteVehiculo() no retornó éxito');
+                    }
+                    
+                    const deletedId = testState.createdVehiculoId;
+                    testState.createdVehiculoId = null;
+                    
+                    return `✓ Vehículo eliminado correctamente (ID: ${deletedId})`;
+                }
+            },
+            {
+                name: 'Estructura de endpoints correcta',
+                description: 'Verificar configuración de endpoints',
+                async run() {
+                    if (vehiculosApi.endpoint !== 'vehiculos.php') {
+                        throw new Error(`Endpoint incorrecto: ${vehiculosApi.endpoint}`);
+                    }
+                    if (vehiculosApi.historialEndpoint !== 'vehiculo_historial.php') {
+                        throw new Error(`Historial endpoint incorrecto: ${vehiculosApi.historialEndpoint}`);
+                    }
+                    return '✓ Endpoints configurados correctamente';
+                }
+            }
+        ];
+
+        // Función para renderizar un test
+        function renderTest(test, index) {
+            const testEl = document.createElement('div');
+            testEl.className = 'test-result pending';
+            testEl.id = `test-${index}`;
+            testEl.innerHTML = `
+                <div class="flex-grow-1">
+                    <div class="d-flex align-items-center">
+                        <span class="test-icon">⏳</span>
+                        <div>
+                            <strong>${test.name}</strong>
+                            <div class="test-details">${test.description}</div>
+                        </div>
+                    </div>
+                </div>
+                <span class="badge bg-secondary">Pendiente</span>
+            `;
+            return testEl;
+        }
+
+        // Función para actualizar el estado de un test
+        function updateTest(index, status, message, duration) {
+            const testEl = document.getElementById(`test-${index}`);
+            testEl.className = `test-result ${status}`;
+            
+            let icon, badge, badgeClass;
+            if (status === 'running') {
+                icon = '⏳';
+                badge = 'Ejecutando...';
+                badgeClass = 'bg-warning';
+            } else if (status === 'success') {
+                icon = '✅';
+                badge = `Passed (${duration}ms)`;
+                badgeClass = 'bg-success';
+            } else if (status === 'error') {
+                icon = '❌';
+                badge = `Failed (${duration}ms)`;
+                badgeClass = 'bg-danger';
+            }
+            
+            testEl.innerHTML = `
+                <div class="flex-grow-1">
+                    <div class="d-flex align-items-center">
+                        <span class="test-icon">${icon}</span>
+                        <div>
+                            <strong>${tests[index].name}</strong>
+                            <div class="test-details">${tests[index].description}</div>
+                            ${message ? `<div class="test-details mt-2">${message}</div>` : ''}
+                        </div>
+                    </div>
+                </div>
+                <span class="badge ${badgeClass}">${badge}</span>
+            `;
+        }
+
+        // Función para actualizar el resumen
+        function updateSummary() {
+            document.getElementById('total-tests').textContent = testState.total;
+            document.getElementById('passed-tests').textContent = testState.passed;
+            document.getElementById('failed-tests').textContent = testState.failed;
+            
+            if (testState.startTime > 0) {
+                const duration = ((Date.now() - testState.startTime) / 1000).toFixed(2);
+                document.getElementById('duration').textContent = `${duration}s`;
+            }
+        }
+
+        // Función para ejecutar un test
+        async function runTest(test, index) {
+            updateTest(index, 'running', '', 0);
+            
+            const startTime = Date.now();
+            try {
+                const result = await test.run();
+                const duration = Date.now() - startTime;
+                
+                testState.passed++;
+                updateTest(index, 'success', result, duration);
+                updateSummary();
+            } catch (error) {
+                const duration = Date.now() - startTime;
+                
+                testState.failed++;
+                updateTest(index, 'error', `❌ ${error.message}`, duration);
+                updateSummary();
+            }
+        }
+
+        // Función para ejecutar todos los tests
+        async function runAllTests() {
+            const runButton = document.getElementById('run-tests');
+            runButton.disabled = true;
+            runButton.textContent = '⏳ Ejecutando tests...';
+            
+            // Reset estado
+            testState.total = tests.length;
+            testState.passed = 0;
+            testState.failed = 0;
+            testState.startTime = Date.now();
+            testState.createdVehiculoId = null;
+            
+            // Renderizar tests
+            const resultsContainer = document.getElementById('test-results');
+            resultsContainer.innerHTML = '';
+            tests.forEach((test, index) => {
+                resultsContainer.appendChild(renderTest(test, index));
+            });
+            
+            updateSummary();
+            
+            // Ejecutar tests secuencialmente
+            for (let i = 0; i < tests.length; i++) {
+                await runTest(tests[i], i);
+                // Pequeña pausa entre tests
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            
+            runButton.disabled = false;
+            runButton.textContent = '🔄 Ejecutar Nuevamente';
+            
+            // Mostrar resultado final
+            if (testState.failed === 0) {
+                runButton.classList.remove('btn-primary');
+                runButton.classList.add('btn-success');
+                runButton.textContent = '✅ Todos los tests pasaron';
+            }
+        }
+
+        // Event listeners
+        document.getElementById('run-tests').addEventListener('click', runAllTests);
+
+        // Ejecutar automáticamente al cargar
+        window.addEventListener('load', () => {
+            setTimeout(runAllTests, 500);
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,154 @@
+/* style.css */
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: #f8f9fa; /* Un gris muy claro para el fondo */
+}
+
+@media print {
+    body { padding: 1cm; text-align: center; }
+    #printable-qr-area { width: 100%; }
+    #qrcode { width: 4cm !important; height: 4cm !important; margin: 0 auto; }
+}
+
+/* Transición suave para los enlaces del menú lateral */
+.nav-pills .nav-link {
+    transition: all 0.2s ease-in-out;
+}
+
+/* Círculos para los íconos del dashboard */
+.icon-circle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+}
+
+/* Animación de rotación para icono de actualización */
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.bi-arrow-clockwise.spin {
+    animation: spin 1s linear infinite;
+}
+
+/* Animaciones para el módulo de pórtico */
+.animate__animated {
+    animation-duration: 0.5s;
+}
+
+.animate__fadeIn {
+    animation-name: fadeIn;
+}
+
+.animate__fadeOut {
+    animation-name: fadeOut;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+/* Nuevas clases de fondo suave para íconos */
+.bg-primary-soft {
+    background-color: rgba(var(--bs-primary-rgb), 0.1);
+    color: var(--bs-primary);
+}
+
+.bg-success-soft {
+    background-color: rgba(var(--bs-success-rgb), 0.1);
+    color: var(--bs-success);
+}
+
+.bg-warning-soft {
+    background-color: rgba(var(--bs-warning-rgb), 0.1);
+    color: var(--bs-warning);
+}
+
+.bg-info-soft {
+    background-color: rgba(var(--bs-info-rgb), 0.1);
+    color: var(--bs-info);
+}
+
+/* Animaciones para el feedback de escaneo */
+.fade-in-out {
+    animation: fadeIn 0.5s ease-out forwards;
+}
+
+.fade-out {
+    animation: fadeOut 0.5s ease-out forwards;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeOut {
+    from { opacity: 1; transform: translateY(0); }
+    to { opacity: 0; transform: translateY(-20px); }
+}
+
+/* Estilo para los botones dentro de un item activo en la lista de empresas */
+.list-group-item.active .btn {
+    color: white;
+    border-color: white;
+}
+
+.list-group-item.active .btn:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Estilos para tarjetas del Dashboard */
+.card.border-left-primary {
+    border-left: 4px solid var(--bs-primary) !important;
+}
+
+.card.border-left-success {
+    border-left: 4px solid var(--bs-success) !important;
+}
+
+.card.border-left-info {
+    border-left: 4px solid var(--bs-info) !important;
+}
+
+.card.border-left-warning {
+    border-left: 4px solid var(--bs-warning) !important;
+}
+
+.card.border-left-danger {
+    border-left: 4px solid var(--bs-danger) !important;
+}
+
+.text-gray-300 {
+    color: #dddfeb !important;
+}
+
+.text-xs {
+    font-size: 0.7rem;
+}
+
+.font-weight-bold {
+    font-weight: 700 !important;
+}
+
+/* Estilos adicionales para los enlaces de detalles */
+.dashboard-detail-link {
+    text-decoration: none;
+    display: block;
+    padding: 0.5rem 1rem;
+    transition: all 0.2s;
+}
+
+.dashboard-detail-link:hover {
+    background-color: rgba(0,0,0,0.05);
+}

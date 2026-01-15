@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Sistema de Control de Acceso Digital (SCAD)</title>
+    <link href="../Libreria/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="../Libreria/vendor/fonts/inter/inter.css" rel="stylesheet">
+    <link rel="stylesheet" href="../Libreria/vendor/bootstrap-icons/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="../Libreria/vendor/font-awesome/css/all.min.css">
+    <link rel="stylesheet" href="../Libreria/vendor/animate-css/animate.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        body {
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            background-color: #f5f5f5;
+        }
+        .form-signin {
+            width: 100%;
+            max-width: 400px;
+            padding: 15px;
+            margin: auto;
+        }
+        .form-signin .form-floating:focus-within {
+            z-index: 2;
+        }
+        .form-signin input[type="text"] {
+            margin-bottom: -1px;
+            border-bottom-right-radius: 0;
+            border-bottom-left-radius: 0;
+        }
+        .form-signin input[type="password"] {
+            margin-bottom: 10px;
+            border-top-left-radius: 0;
+            border-top-right-radius: 0;
+        }
+    </style>
+</head>
+<body class="text-center">
+    <main class="form-signin">
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <i class="bi bi-shield-lock text-primary" style="font-size: 3rem;"></i>
+                <h1 class="h3 mb-3 fw-normal">SCAD</h1>
+                <p class="text-muted mb-4">Sistema de Control de Acceso Digital</p>
+                
+                <form id="login-form">
+                    <div class="form-floating mb-3">
+                        <input type="text" class="form-control" id="username" placeholder="Usuario" required>
+                        <label for="username">Usuario</label>
+                    </div>
+                    <div class="form-floating mb-4">
+                        <input type="password" class="form-control" id="password" placeholder="Contraseña" required>
+                        <label for="password">Contraseña</label>
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button class="btn btn-primary btn-lg" type="submit">Iniciar Sesión</button>
+                    </div>
+                </form>
+                
+                <div id="login-error" class="alert alert-danger mt-3" style="display: none;">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                    <span id="login-error-message">Error de autenticación</span>
+                </div>
+            </div>
+        </div>
+        <p class="mt-3 mb-3 text-muted">&copy; 2023 Sistema de Control de Acceso</p>
+    </main>
+
+    <!-- Scripts -->
+    <script src="../Libreria/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="js/utils/api.js?v=1725296422"></script>
+    <script src="js/login.js"></script>
+</body>
+</html>

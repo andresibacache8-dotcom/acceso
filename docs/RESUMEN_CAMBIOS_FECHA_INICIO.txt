@@ -1,0 +1,232 @@
+================================================================================
+RESUMEN DE CAMBIOS - AGREGAR "FECHA DE INICIO DE ACCESO" A CARGA MASIVA
+================================================================================
+
+SOLICITUD DEL USUARIO:
+Agregar el campo "Fecha de Inicio de Acceso" al módulo de carga masiva de
+vehículos, ya que es un campo importante para determinar desde cuándo el
+vehículo puede ingresar a la base militar.
+
+CAMBIOS REALIZADOS:
+
+================================================================================
+1. ARCHIVO: js/modules/vehiculos.js
+================================================================================
+
+A) FUNCIÓN: descargarPlantillaExcel() (líneas 656-695)
+   ───────────────────────────────────────────────────
+   CAMBIOS:
+   - Agregó "fecha_inicio" a la lista de encabezados (línea 659)
+   - Actualizado orden de columnas:
+     Antes: patente, marca, modelo, tipo, tipo_vehiculo, personalNrRut,
+            acceso_permanente, fecha_expiracion
+     Ahora: patente, marca, modelo, tipo, tipo_vehiculo, personalNrRut,
+            fecha_inicio, acceso_permanente, fecha_expiracion
+
+   - Datos de ejemplo actualizados (líneas 661-663):
+     * Fila 1: SD4115, ..., 17964768, "2025-01-15", 0, 2025-12-31
+     * Fila 2: AB1234, ..., 12345678, "2025-02-01", 1, (vacío)
+     * Fila 3: XY5678, ..., 98765432, "2025-01-20", 0, 2025-11-15
+
+   - Ancho de columnas ajustado (línea 678):
+     Agregó {wch: 18} para fecha_inicio
+
+B) FUNCIÓN: descargarPlantillaCsv() (líneas 701-730)
+   ──────────────────────────────────────────────────
+   CAMBIOS IDÉNTICOS a Excel:
+   - Encabezados incluyen "fecha_inicio" (línea 703)
+   - Datos de ejemplo con fechas de inicio (líneas 705-707)
+   - Mismo formato CSV separado por comas
+
+C) FUNCIÓN: validateImportStructure() (NUEVA, líneas 925-946)
+   ──────────────────────────────────────────────────────────
+   PROPÓSITO: Nueva función de validación que documentaba la estructura esperada
+   CAMPOS REQUERIDOS: patente, marca, modelo, tipo, personalNrRut, acceso_permanente
+   CAMPOS OPCIONALES: tipo_vehiculo, fecha_inicio, fecha_expiracion
+
+   NOTA: La validación actual sigue siendo flexible con campos opcionales
+
+D) FUNCIÓN: processVehiculosImport() (línea 1057)
+   ───────────────────────────────────────────────
+   CAMBIO: Agregó campo fecha_inicio al objeto vehiculoData
+
+   Línea 1057: fecha_inicio: vehiculo.fecha_inicio || null,
+
+   UBICACIÓN en vehiculoData:
+   - patente
+   - marca
+   - modelo
+   - tipo
+   - tipo_vehiculo
+   - personalNrRut
+   - fecha_inicio  ← NUEVO
+   - acceso_permanente
+   - fecha_expiracion
+
+================================================================================
+2. ARCHIVO: js/ui/ui.js
+================================================================================
+
+A) PLANTILLA MODAL: getImportVehiculosModalTemplate() (líneas 416-432)
+   ────────────────────────────────────────────────────────────────────
+   CAMBIO 1: Actualización de texto de columnas (línea 416)
+   Antes: patente, marca, modelo, tipo, personalNrRut, acceso_permanente,
+          fecha_expiracion
+   Ahora: patente, marca, modelo, tipo, tipo_vehiculo, personalNrRut,
+          fecha_inicio, acceso_permanente, fecha_expiracion
+
+   CAMBIO 2: Mejora de instrucciones (líneas 418-433)
+   Se agregaron más detalles sobre el formato esperado:
+   - Especificación de tipos válidos de acceso:
+     PERSONAL, FUNCIONARIO, RESIDENTE, FISCAL, EMPLEADO, EMPRESA, VISITA
+   - Ejemplos de tipos de vehículos: AUTO, FURGON, MOTO, BICICLETA
+   - Explicación clara de personalNrRut (RUT sin puntos ni guión)
+   - ESPECIFICACIÓN NUEVA: fecha_inicio es la fecha desde cuando el vehículo
+     puede ingresar
+   - Clarificación: fecha_expiracion es opcional si acceso_permanente=1
+   - Reiteración: Todas las fechas en formato YYYY-MM-DD
+
+================================================================================
+FLUJO COMPLETO DE LA IMPORTACIÓN CON fecha_inicio
+================================================================================
+
+PASO 1: Usuario descarga plantilla Excel
+   └─> Archivo incluye columna "fecha_inicio" con ejemplos: 2025-01-15, 2025-02-01
+
+PASO 2: Usuario llena datos en Excel
+   └─> Introduce fecha_inicio para cada vehículo (ej: 2025-01-01)
+
+PASO 3: Usuario selecciona y carga archivo
+   └─> handleImportVehiculos() lee el archivo
+
+PASO 4: Validación de estructura
+   └─> Verifica que hay encabezados correctos
+   └─> fecha_inicio es detectado desde el archivo
+
+PASO 5: Procesamiento de datos (processVehiculosImport)
+   └─> Para cada vehículo:
+       - Lee fecha_inicio: vehiculo.fecha_inicio
+       - Incluye en vehiculoData: fecha_inicio: vehiculo.fecha_inicio || null
+       - Envía al API junto con otros campos
+
+PASO 6: API recibe y guarda
+   └─> api/vehiculos.php línea 306:
+       INSERT INTO vehiculos (...fecha_inicio...)
+   └─> Guarda en base de datos
+
+PASO 7: Tabla actualiza
+   └─> Vehículos importados ahora tienen fecha_inicio registrada
+   └─> Pueden usarse para validar acceso desde esa fecha
+
+================================================================================
+COMPATIBILIDAD CON FUNCIONES EXISTENTES
+================================================================================
+
+✓ API backend (api/vehiculos.php):
+  - Ya maneja fecha_inicio correctamente (línea 306, 314)
+  - Ya valida y procesa la fecha
+  - Ya la devuelve en GET (línea 150, 181)
+
+✓ Modal de edición de vehículos:
+  - Ya tiene campo fecha_inicio (js/ui/ui.js línea 1211)
+  - Ya muestra y edita el valor correctamente
+
+✓ Tabla de vehículos:
+  - Puede mostrar fecha_inicio si se desea (pendiente para futuro)
+
+================================================================================
+ESTRUCTURA DE DATOS ESPERADA
+================================================================================
+
+Columna en archivo:        Nombre en DB:      Tipo:      Obligatorio:
+patente                    patente            string     Sí
+marca                      marca              string     Sí
+modelo                     modelo             string     Sí
+tipo                       tipo               string     Sí
+tipo_vehiculo              tipo_vehiculo      string     No (default: AUTO)
+personalNrRut              personalNrRut      string     Sí
+fecha_inicio               fecha_inicio       date       No (puede ser vacío)
+acceso_permanente          acceso_permanente  int(0/1)   Sí
+fecha_expiracion           fecha_expiracion   date       No (vacío si permanente=1)
+
+================================================================================
+EJEMPLOS DE USO
+================================================================================
+
+EJEMPLO 1: Vehículo con acceso desde fecha específica hasta expiración
+patente,marca,modelo,tipo,tipo_vehiculo,personalNrRut,fecha_inicio,acceso_permanente,fecha_expiracion
+SD4115,TOYOTA,SANTA FE,VISITA,FURGON,17964768,2025-01-15,0,2025-12-31
+
+EJEMPLO 2: Vehículo con acceso permanente desde fecha
+AB1234,HONDA,CIVIC,FUNCIONARIO,AUTO,12345678,2025-02-01,1,
+
+EJEMPLO 3: Vehículo que puede entrar a partir de una fecha
+XY5678,FORD,FIESTA,EMPRESA,AUTO,98765432,2025-03-15,0,2026-03-14
+
+================================================================================
+INSTRUCCIONES DE PRUEBA
+================================================================================
+
+1. DESCARGAR PLANTILLA ACTUALIZADA
+   - Ir a Vehículos → Carga Masiva
+   - Descargar "plantilla_vehiculos.xlsx"
+   - Verificar que ahora incluye columna "fecha_inicio"
+   - Orden correcto: patente, marca, modelo, tipo, tipo_vehiculo,
+     personalNrRut, fecha_inicio, acceso_permanente, fecha_expiracion
+
+2. IMPORTAR CON FECHAS DE INICIO
+   - Crear o modificar archivo Excel con datos incluyendo fecha_inicio
+   - Seleccionar archivo
+   - Hacer clic en "Iniciar Importación"
+   - Verificar que se importan correctamente
+
+3. VALIDAR EN BASE DE DATOS
+   - Después de importar, revisar tabla vehiculos
+   - Columna fecha_inicio debe contener las fechas ingresadas
+   - Ejemplo: SELECT patente, fecha_inicio FROM vehiculos;
+
+4. VERIFICAR EN MODAL DE EDICIÓN
+   - Abrir un vehículo importado para editar
+   - Campo "Fecha de Inicio de Acceso" debe mostrar la fecha importada
+   - Debe poder modificarla si es necesario
+
+================================================================================
+BENEFICIOS DE ESTE CAMBIO
+================================================================================
+
+✓ Control temporal de acceso: Los vehículos pueden tener inicio diferido
+✓ Coordinación: Permite registrar vehículos con fecha futura de ingreso
+✓ Auditoría: Registro de desde cuándo tiene acceso cada vehículo
+✓ Flexibilidad: El campo es opcional, funciona con o sin fecha
+✓ Consistencia: Mismo campo disponible en importación y edición manual
+
+================================================================================
+ARCHIVOS MODIFICADOS
+================================================================================
+
+1. C:\xampp\htdocs\Desarrollo\acceso\js\modules\vehiculos.js
+   - Líneas 659: Agregó "fecha_inicio" a headers Excel
+   - Líneas 661-663: Actualizó datos de ejemplo con fechas
+   - Líneas 678: Ajustó ancho de columna para fecha_inicio
+   - Línea 703: Agregó "fecha_inicio" a headers CSV
+   - Líneas 705-707: Actualizó datos ejemplo CSV con fechas
+   - Líneas 925-946: Nueva función validateImportStructure (documentativa)
+   - Línea 1057: Agregó fecha_inicio a vehiculoData en processVehiculosImport
+
+2. C:\xampp\htdocs\Desarrollo\acceso\js\ui\ui.js
+   - Línea 416: Actualización de descripción de columnas
+   - Líneas 418-433: Mejora de instrucciones con más detalles
+
+================================================================================
+ESTADO FINAL
+================================================================================
+
+✓ Plantillas Excel y CSV incluyen fecha_inicio
+✓ Instrucciones claras para el usuario
+✓ Validación preparada
+✓ Datos procesados correctamente
+✓ API backend ya soporta el campo
+✓ Modal de edición sincronizado
+✓ Listo para prueba completa
+
+================================================================================

@@ -1,0 +1,166 @@
+═══════════════════════════════════════════════════════════════════════════════
+        SISTEMA DE IMPORTACIÓN MASIVA DE PERSONAL - GUÍA RÁPIDA
+═══════════════════════════════════════════════════════════════════════════════
+
+1. ACCESO RÁPIDO
+───────────────────────────────────────────────────────────────────────────────
+   URL: http://localhost/Desarrollo/acceso/
+   Sección: Mantenedores → Personal
+   Botón: "Importar Masivo" (color verde, lado derecho)
+
+2. PASOS PARA IMPORTAR
+───────────────────────────────────────────────────────────────────────────────
+   Paso 1: Click en "Importar Masivo"
+           ↓
+   Paso 2: Click en "Descargar Plantilla" (opcional pero recomendado)
+           ↓
+   Paso 3: Selecciona archivo (.xlsx, .xls o .csv)
+           ↓
+   Paso 4: Click en "Importar"
+           ↓
+   Paso 5: Espera a que se complete
+           ↓
+   Paso 6: Revisa resultados en modal
+           ↓
+   Paso 7: Tabla se recarga automáticamente
+
+3. FORMATO DE ARCHIVO
+───────────────────────────────────────────────────────────────────────────────
+   Columnas REQUERIDAS:
+   • Nombres       - Ej: JUAN
+   • Paterno       - Ej: GONZALEZ
+   • NrRut         - Ej: 12345678-9 o 123456789
+
+   Columnas OPCIONALES:
+   • Materno       - Ej: LOPEZ
+   • Grado         - Ej: SARGENTO
+   • Unidad        - Ej: A1
+   • Estado        - 1 (activo) o 0 (inactivo)
+   • es_residente  - 1 (residente) o 0 (no residente)
+
+4. EJEMPLO DE CSV
+───────────────────────────────────────────────────────────────────────────────
+   Grado,Nombres,Paterno,Materno,NrRut,Unidad,Estado,es_residente
+   SARGENTO,JUAN,GONZALEZ,LOPEZ,12345678-9,A1,1,0
+   CABO,MARIA,RODRIGUEZ,MARTINEZ,87654321-4,A2,1,0
+   TENIENTE,CARLOS,FERNANDEZ,GARCIA,11111111-1,B1,1,0
+
+5. ARCHIVO DE PRUEBA DISPONIBLE
+───────────────────────────────────────────────────────────────────────────────
+   Ubicación: templates/plantilla_personal_ejemplo.csv
+   Contiene: 5 registros de ejemplo listos para importar
+
+6. QUÉ SUCEDE DURANTE LA IMPORTACIÓN
+───────────────────────────────────────────────────────────────────────────────
+   ✓ Lectura del archivo (Excel/CSV)
+   ✓ Validación de campos requeridos
+   ✓ Validación de formato RUT
+   ✓ Normalización de datos (mayúsculas, trim)
+   ✓ Detección de duplicados por RUT
+   ✓ Creación o actualización en BD
+   ✓ Transacción única (todo o nada)
+   ✓ Reporte detallado de resultados
+
+7. INTERPRETACIÓN DE RESULTADOS
+───────────────────────────────────────────────────────────────────────────────
+   Total      = Cantidad total de filas procesadas
+   Procesados = Cantidad completada (éxito + error)
+   Creados    = Nuevos registros insertados
+   Actualizados = Registros con RUT existente que se modificaron
+   Errores    = Cantidad de filas con problemas
+
+8. ERRORES COMUNES Y SOLUCIONES
+───────────────────────────────────────────────────────────────────────────────
+   Problema: "Faltan campos requeridos: Nombres, Paterno o NrRut"
+   Solución: Verifica que las columnas sean exactamente iguales y no estén vacías
+
+   Problema: "RUT inválido: 999..."
+   Solución: Usa formato 12345678-9 o 123456789 (sin espacios ni puntos)
+
+   Problema: "El archivo está vacío o no se pudo leer"
+   Solución: Asegúrate que el archivo tenga al menos 1 fila de datos (sin contar encabezado)
+
+   Problema: Modal no aparece
+   Solución: Recarga la página (F5) y vuelve a intentar
+
+9. CAMPOS NORMALIZADOS AUTOMÁTICAMENTE
+───────────────────────────────────────────────────────────────────────────────
+   • Se convierten a MAYÚSCULAS automáticamente:
+     - Nombres
+     - Paterno
+     - Materno
+     - Grado
+     - Unidad
+     - RUT
+
+   • Se eliminan espacios al inicio y final (trim)
+   • Se detectan duplicados por RUT (actualiza vs crea)
+
+10. ARCHIVOS DOCUMENTACIÓN
+───────────────────────────────────────────────────────────────────────────────
+    IMPORTACION_PERSONAL.md  - Documentación técnica completa
+    RESUMEN_IMPORTACION.md   - Resumen del proyecto
+    GUIA_RAPIDA.txt          - Este archivo
+    templates/plantilla_personal_ejemplo.csv - Archivo de ejemplo
+
+11. VALIDACIONES EN SERVIDOR
+───────────────────────────────────────────────────────────────────────────────
+    ✓ Campos requeridos no pueden estar vacíos
+    ✓ Formato RUT debe ser válido (7-10 dígitos + guión opcional)
+    ✓ Todas las operaciones se hacen en una transacción (rollback si error)
+    ✓ Prepared statements para evitar SQL injection
+    ✓ Normalización de datos (mayúsculas, trim)
+
+12. ENDPOINT DE API
+───────────────────────────────────────────────────────────────────────────────
+    Método: POST
+    URL:    api/personal.php?action=import
+
+    Request:
+    {
+      "personal": [
+        {
+          "Nombres": "JUAN",
+          "Paterno": "GONZALEZ",
+          "Materno": "LOPEZ",
+          "NrRut": "12345678-9",
+          "Grado": "SARGENTO",
+          "Unidad": "A1",
+          "Estado": 1,
+          "es_residente": 0
+        }
+      ]
+    }
+
+    Response (200 OK):
+    {
+      "success": [...],
+      "errors": [...],
+      "total": 1,
+      "processed": 1,
+      "created": 1,
+      "updated": 0
+    }
+
+13. TIPS Y MEJORES PRÁCTICAS
+───────────────────────────────────────────────────────────────────────────────
+    • Descarga siempre la plantilla primero como referencia
+    • Verifica los RUT antes de importar (evita duplicados)
+    • Para actualizaciones, asegúrate que el RUT sea correcto
+    • Prueba primero con un pequeño lote de datos
+    • Revisa los errores reportados para corregir datos
+    • Los registros con error no se crean (rollback automático)
+
+14. ARCHIVOS MODIFICADOS
+───────────────────────────────────────────────────────────────────────────────
+    ✓ api/personal.php                     - Backend (importación)
+    ✓ js/api/personal-api.js               - API Client (método importMasivo)
+    ✓ js/modules/personal.js               - Funciones frontend (8 funciones nuevas)
+    ✓ js/ui/templates-personal.js          - Botón "Importar Masivo"
+    ✓ index.html                           - Modales (2 divs añadidos)
+
+═══════════════════════════════════════════════════════════════════════════════
+Última actualización: 2025-11-05
+Sistema: SCAD (Sistema de Control de Acceso Digital)
+Estado: ✅ COMPLETADO Y FUNCIONAL
+═══════════════════════════════════════════════════════════════════════════════
