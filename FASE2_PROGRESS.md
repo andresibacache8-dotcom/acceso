@@ -18,12 +18,12 @@ Extender los beneficios de FASE 1 (config centralizada + respuestas estandarizad
 | **horas_extra.php** | ✅ Migrada | 206 → 260 | 7/7 ✅ | Piloto exitoso |
 | **personal.php** | ✅ Migrada | 450 → 833 | 10/10 ✅ | Importación masiva mantenida |
 | **empresas.php** | ✅ Migrada | 155 → 480 | 12/12 ✅ | POC enrichment + paginación |
-| **vehiculos.php** | ⏳ Pendiente | 1,709 | - | CRUD + QR + historial |
-| **visitas.php** | ⏳ Pendiente | 562 | - | CRUD + lista negra |
+| **visitas.php** | ✅ Migrada | 227 → 710 | 14/14 ✅ | Status + toggle blacklist |
+| **vehiculos.php** | ⏳ Siguiente | 1,709 | - | CRUD + QR + historial |
 | **control.php** | ⏳ Pendiente | 1,679 | - | Escaneo pórtico |
 | Resto (12 APIs) | ⏳ Pendiente | ~3,500 | - | APIs menores |
 
-### APIs Completadas (3/21 - 14.3%)
+### APIs Completadas (4/21 - 19.0%)
 
 #### ✅ horas_extra.php
 - **Antes**: 206 líneas (inconsistente)
@@ -64,6 +64,27 @@ Extender los beneficios de FASE 1 (config centralizada + respuestas estandarizad
   - POC Enrichment: Función enrichEmpresaWithPOC() obtiene datos de personal si existen
 - **Funcionalidad**: CRUD completo mantenido (2 registros activos)
 - **Conexiones**: Usa ambas BD (acceso + personal) para enriquecimiento
+
+#### ✅ visitas.php
+- **Antes**: 227 líneas (inconsistente, sin paginación)
+- **Después**: 710 líneas (estandarizado + modular + paginado)
+- **Tests**: 14 tests ✅
+- **Cambios clave**:
+  - Config: `database/db_acceso.php` → `config/database.php`
+  - Respuestas: Estandarizadas con ApiResponse
+  - GET: Búsqueda por nombre/paterno/rut + filtros tipo/status + paginación
+  - GET ?id=: Obtener visita específica
+  - POST: Crear visita con POC/Familiar enrichment desde personal DB
+  - PUT: Update general de visita
+  - PUT ?action=toggle_blacklist: Acción especial para toggle lista negra (recalcula status)
+  - DELETE: Eliminación con verificación de existencia
+  - Status Calculation: `calculateVisitaStatus()` determina autorizado/no autorizado basado en:
+    - Lista negra → "no autorizado"
+    - Acceso permanente → "autorizado"
+    - Rango de fechas válido → "autorizado"
+  - Enriquecimiento: `enrichVisitaWithPersonal()` obtiene datos de POC/Familiar desde personal
+- **Funcionalidad**: CRUD + filtros avanzados + status dinámico (4 registros activos)
+- **Conexiones**: Usa ambas BD (acceso + personal) para búsquedas
 
 ---
 
@@ -129,19 +150,20 @@ function handleDelete($conn) {
 
 ### Migraciones Completadas
 ```
-APIs migradas: 3/21 (14.3%)
-Tests implementados: 3 suites (29 tests)
-Tests pasados: 29/29 (100%)
-Líneas de código nuevo: ~1,573
+APIs migradas: 4/21 (19.0%)
+Tests implementados: 4 suites (43 tests)
+Tests pasados: 43/43 (100%)
+Líneas de código nuevo: ~2,283
 ```
 
 ### Beneficios Entregados
-- ✅ Config centralizada en 3 APIs (credenciales protegidas)
-- ✅ Respuestas estandarizadas en 3 APIs
-- ✅ Paginación implementada en 3 APIs
-- ✅ Testing validando calidad de migraciones (29 tests, 100% pasados)
-- ✅ Patrón establecido para replicar en 18 APIs restantes
-- ✅ POC enrichment pattern validado (interconexión entre BDs)
+- ✅ Config centralizada en 4 APIs (credenciales protegidas)
+- ✅ Respuestas estandarizadas en 4 APIs
+- ✅ Paginación implementada en 4 APIs
+- ✅ Testing validando calidad de migraciones (43 tests, 100% pasados)
+- ✅ Patrón establecido para replicar en 17 APIs restantes
+- ✅ Status calculation pattern validado (dinamico basado en reglas de negocio)
+- ✅ Toggle actions pattern validado (recalcula status)
 
 ---
 
@@ -244,6 +266,7 @@ Líneas de código nuevo: ~1,573
 ## 📝 Commits FASE 2
 
 ```
+cffe78e - Refactor: Migrate visitas.php API (14 tests ✅)
 3b5ec19 - Refactor: Migrate empresas.php API (12 tests ✅)
 f0c5946 - Refactor: Migrate personal.php API (10 tests ✅)
 556116e - Test: Add horas_extra.php migration test (7 tests ✅)
@@ -255,19 +278,19 @@ f0c5946 - Refactor: Migrate personal.php API (10 tests ✅)
 ## 📊 Beneficios Logrados Hasta Ahora
 
 ### Seguridad
-- ✅ Credenciales de 3 APIs (horas_extra, personal, empresas) ahora centralizadas
+- ✅ Credenciales de 4 APIs (horas_extra, personal, empresas, visitas) centralizadas
 - ✅ No hay secretos en código migrado
-- ✅ 18 APIs restantes aún con credenciales hardcodeadas ⚠️
+- ✅ 17 APIs restantes aún con credenciales hardcodeadas ⚠️
 
 ### Escalabilidad
-- ✅ Paginación en 3 APIs (incluyendo CRUD simple + búsqueda)
-- ✅ 18 APIs restantes sin paginación ⚠️
-- ✅ Patrón consolidado y validado
+- ✅ Paginación en 4 APIs (CRUD simple, masivo, con búsquedas, con filtros avanzados)
+- ✅ 17 APIs restantes sin paginación ⚠️
+- ✅ Patrones consolidados y validados (simple CRUD, bulk import, status calculation, toggle actions)
 
 ### Mantenibilidad
-- ✅ Respuestas estandarizadas en 3 APIs
-- ✅ 18 APIs con formatos inconsistentes ⚠️
-- ✅ Testing validando calidad (29 tests, 100% pasados)
+- ✅ Respuestas estandarizadas en 4 APIs
+- ✅ 17 APIs con formatos inconsistentes ⚠️
+- ✅ Testing validando calidad (43 tests, 100% pasados)
 
 ### Performance
 - ✅ personal.php con 1,228 registros: paginación activa
@@ -303,7 +326,7 @@ f0c5946 - Refactor: Migrate personal.php API (10 tests ✅)
 
 ---
 
-**Estado Actual**: 📍 3 APIs migradas de 21 (14.3%)
-**Progreso FASE 2**: 📊 Consolidado - Patrón validado
+**Estado Actual**: 📍 4 APIs migradas de 21 (19.0%)
+**Progreso FASE 2**: 📊 1/5 del proyecto migrado - Patrones validados
 **Próxima Acción**: Migrar vehiculos.php (ETAPA 2.1.6)
 
