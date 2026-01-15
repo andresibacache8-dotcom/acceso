@@ -26,10 +26,11 @@ Extender los beneficios de FASE 1 (config centralizada + respuestas estandarizad
 | **guardia-servicio.php** | ✅ Migrada | 271 → 405 | 13/13 ✅ | Guard/Service + access_logs |
 | **log_clarified_access.php** | ✅ Migrada | 134 → 185 | 12/12 ✅ | Access logging + validation |
 | **empresa_empleados.php** | ✅ Migrada | 411 → 520 | 13/13 ✅ | Employees CRUD + status calc |
+| **comision.php** | ✅ Migrada | 162 → 290 | 12/12 ✅ | Commissions CRUD + status |
 | **vehiculos.php** | ⏳ Próxima | 1,709 | - | CRUD + QR + historial |
-| Resto (5 APIs) | ⏳ Pendiente | ~2,400 | - | APIs menores/medianas |
+| Resto (4 APIs) | ⏳ Pendiente | ~2,150 | - | APIs menores/medianas |
 
-### APIs Completadas (11/21 - 52.4%)
+### APIs Completadas (12/21 - 57.1%)
 
 #### ✅ horas_extra.php
 - **Antes**: 206 líneas (inconsistente)
@@ -213,6 +214,26 @@ Extender los beneficios de FASE 1 (config centralizada + respuestas estandarizad
   - CORS: Soporta preflight OPTIONS
 - **Funcionalidad**: CRUD completo de empleados empresariales con acceso temporal/permanente (6 empleados activos)
 
+#### ✅ comision.php
+- **Antes**: 162 líneas (simple, sin validación robusta)
+- **Después**: 290 líneas (estandarizado + modular + validado)
+- **Tests**: 12 tests ✅
+- **Cambios clave**:
+  - Config: `database/db_personal.php` → `config/database.php`
+  - Respuestas: Estandarizadas con ApiResponse
+  - GET: Listar todas las comisiones con nombre completo construido (CONCAT_WS)
+  - POST: Crear comisión con validación de 11 campos requeridos
+  - PUT: Actualizar comisión con verificación de existencia
+  - DELETE: Eliminar comisión (hard delete)
+  - Validación: Campos requeridos (rut, grado, nombres, paterno, unidad_origen, unidad_poc, fecha_inicio, fecha_fin, motivo, poc_nombre, poc_anexo)
+  - Status dinámico: Función calculateComisionStatus() evalúa:
+    - Sin fecha_fin → "Activo"
+    - fecha_fin >= hoy → "Activo"
+    - fecha_fin < hoy → "Finalizado"
+  - Formato fechas: DATE_FORMAT para YYYY-MM-DD
+  - Nombre completo: CONCAT_WS(' ', grado, nombres, paterno, materno)
+- **Funcionalidad**: CRUD completo de comisiones de personal (1 comisión activa)
+
 ---
 
 ## 🎯 Patrón Establecido para Migraciones
@@ -277,19 +298,19 @@ function handleDelete($conn) {
 
 ### Migraciones Completadas
 ```
-APIs migradas: 11/21 (52.4%)
-Tests implementados: 11 suites (114 tests)
-Tests pasados: 114/114 (100%)
-Líneas de código nuevo: ~6,750
+APIs migradas: 12/21 (57.1%)
+Tests implementados: 12 suites (126 tests)
+Tests pasados: 126/126 (100%)
+Líneas de código nuevo: ~7,200
 ```
 
 ### Beneficios Entregados
-- ✅ Config centralizada en 11 APIs (credenciales protegidas)
-- ✅ Respuestas estandarizadas en 11 APIs
+- ✅ Config centralizada en 12 APIs (credenciales protegidas)
+- ✅ Respuestas estandarizadas en 12 APIs
 - ✅ Paginación implementada en 5 APIs (horas_extra, personal, empresas, visitas, guardia-servicio)
-- ✅ Testing validando calidad de migraciones (114 tests, 100% pasados)
-- ✅ Patrón establecido para replicar en 10 APIs restantes
-- ✅ 11 patrones de API validados y documentados:
+- ✅ Testing validando calidad de migraciones (126 tests, 100% pasados)
+- ✅ Patrón establecido para replicar en 9 APIs restantes
+- ✅ 12 patrones de API validados y documentados:
   - Simple CRUD (users, empresas)
   - Búsqueda multi-tabla (buscar_personal)
   - Status dinámico (visitas)
@@ -467,7 +488,7 @@ f0c5946 - Refactor: Migrate personal.php API (10 tests ✅)
 
 ---
 
-**Estado Actual**: 📍 11 APIs migradas de 21 (52.4%)
-**Progreso FASE 2**: 📊 Más de 52% del proyecto migrado - Patrón consolidado
-**Próxima Acción**: Continuar con APIs medianas (comision, reportes, log_access)
+**Estado Actual**: 📍 12 APIs migradas de 21 (57.1%)
+**Progreso FASE 2**: 📊 Más de 57% del proyecto migrado - Patrón completamente consolidado
+**Próxima Acción**: Continuar con APIs medianas (reportes, log_access, dashboard)
 
