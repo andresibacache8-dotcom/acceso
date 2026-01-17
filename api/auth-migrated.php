@@ -17,16 +17,23 @@
 
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/core/ResponseHandler.php';
+require_once __DIR__ . '/core/JwtHandler.php';
+require_once __DIR__ . '/core/RateLimiter.php';
+require_once __DIR__ . '/core/AuditLogger.php';
+require_once __DIR__ . '/core/SecurityHeaders.php';
+require_once __DIR__ . '/core/AuthMiddleware.php';
 
-// Headers
-header('Content-Type: application/json');
-session_start();
+// Headers de seguridad
+SecurityHeaders::applyApiHeaders();
 
 // Obtener conexión desde DatabaseConfig singleton
 $databaseConfig = DatabaseConfig::getInstance();
 $conn_acceso = $databaseConfig->getAccesoConnection();
 
 if (!$conn_acceso) {
+    AuditLogger::log('AUTH_FAILED', [
+        'reason' => 'Database connection failed'
+    ], 'CRITICAL');
     ApiResponse::serverError('Error conectando a base de datos');
 }
 
@@ -47,32 +54,42 @@ switch ($method) {
 
 /**
  * GET /api/auth.php
- * Verifica si el usuario actual está autenticado
+ * Verifica si el usuario actual está autenticado mediante JWT
+ *
+ * Requiere:
+ * - Header: Authorization: Bearer <token>
  *
  * Retorna:
  * - success: true + datos del usuario si está autenticado
- * - error 401 si no está autenticado
+ * - error 401 si no está autenticado o token inválido
  */
 function handleGet()
 {
-    // Verificar autenticación
-    if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
-        ApiResponse::unauthorized('No autorizado. Por favor, inicie sesión.');
+    try {
+        // Verificar autenticación con JWT
+        $user = AuthMiddleware::requireAuth();
+
+        // Retornar datos del usuario actual
+        $response = [
+            'id' => $user['userId'] ?? null,
+            'username' => $user['username'] ?? null,
+            'role' => $user['role'] ?? null
+        ];
+
+        AuditLogger::log('AUTH_TOKEN_VALIDATED', [
+            'user_id' => $user['userId'] ?? null
+        ]);
+
+        ApiResponse::success($response);
+
+    } catch (Exception $e) {
+        ApiResponse::unauthorized($e->getMessage());
     }
-
-    // Retornar datos del usuario actual
-    $response = [
-        'id' => $_SESSION['user_id'] ?? null,
-        'username' => $_SESSION['username'] ?? null,
-        'role' => $_SESSION['role'] ?? null
-    ];
-
-    ApiResponse::success($response);
 }
 
 /**
  * POST /api/auth.php
- * Autentica un usuario y crea sesión
+ * Autentica un usuario y retorna JWT token
  *
  * Parámetros (JSON):
  * - username: nombre de usuario (requerido)
@@ -82,6 +99,8 @@ function handleGet()
  * {
  *   "success": true,
  *   "data": {
+ *     "token": "eyJ0eXAiOiJKV1QiLCJhbGc...",
+ *     "refreshToken": "eyJ0eXAiOiJKV1QiLCJhbGc...",
  *     "user": {
  *       "id": 1,
  *       "username": "usuario",
@@ -104,10 +123,23 @@ function handleGet()
 function handlePost($conn_acceso)
 {
     try {
+        // Aplicar rate limiting en login (máx 5 intentos en 5 minutos)
+        try {
+            RateLimiter::check('login', 5, 300);
+        } catch (Exception $e) {
+            AuditLogger::log('LOGIN_RATE_LIMITED', [
+                'ip' => $_SERVER['REMOTE_ADDR'] ?? 'unknown'
+            ], 'WARNING');
+            ApiResponse::error($e->getMessage(), $e->getCode());
+        }
+
         $data = json_decode(file_get_contents('php://input'), true);
 
         // Validar campos requeridos
         if (empty($data['username']) || empty($data['password'])) {
+            AuditLogger::log('LOGIN_FAILED', [
+                'reason' => 'Missing required fields'
+            ], 'WARNING');
             ApiResponse::badRequest('Campos requeridos: username, password');
         }
 
@@ -128,17 +160,31 @@ function handlePost($conn_acceso)
 
         // Verificar que el usuario existe y contraseña es correcta
         if (!$user || !password_verify($password, $user['password'])) {
+            AuditLogger::log('LOGIN_FAILED', [
+                'username' => $username,
+                'reason' => 'Invalid credentials'
+            ], 'WARNING');
             ApiResponse::unauthorized('Usuario o contraseña incorrectos');
         }
 
-        // Crear sesión
-        $_SESSION['user_id'] = $user['id'];
-        $_SESSION['username'] = $user['username'];
-        $_SESSION['role'] = $user['role'];
-        $_SESSION['logged_in'] = true;
+        // Generar JWT tokens
+        $accessToken = JwtHandler::generate($user['id'], $user['username'], $user['role'], false);
+        $refreshToken = JwtHandler::generate($user['id'], $user['username'], $user['role'], true);
 
-        // Retornar datos del usuario autenticado
+        // Log login exitoso
+        AuditLogger::log('LOGIN', [
+            'user_id' => $user['id'],
+            'username' => $user['username'],
+            'role' => $user['role']
+        ]);
+
+        // Resetear rate limiter después de login exitoso
+        RateLimiter::reset('login');
+
+        // Retornar datos del usuario autenticado con tokens
         $response = [
+            'token' => $accessToken,
+            'refreshToken' => $refreshToken,
             'user' => [
                 'id' => (int)$user['id'],
                 'username' => $user['username'],
