@@ -114,35 +114,21 @@ jobs:
       - name: Checkout código
         uses: actions/checkout@v3
 
-      - name: Generar resumen
-        run: |
-          echo "# ✅ Suite de Tests SCAD" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## Backend (PHPUnit)" >> $GITHUB_STEP_SUMMARY
-          echo "- Estado: ${{ needs.backend-tests.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Archivo: \`phpunit.xml\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## Frontend (Jest)" >> $GITHUB_STEP_SUMMARY
-          echo "- Estado: ${{ needs.frontend-tests.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Archivo: \`package.json\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## 📈 Cobertura" >> $GITHUB_STEP_SUMMARY
-          echo "- Backend: https://codecov.io/gh/${{ github.repository }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Frontend: https://codecov.io/gh/${{ github.repository }}" >> $GITHUB_STEP_SUMMARY
-
-      - name: Verificar estado general
+      - name: Mostrar resumen
         if: always()
         run: |
-          BACKEND_STATUS="${{ needs.backend-tests.result }}"
+          echo "✅ Suite de Tests SCAD"
+          echo "Backend: ${{ needs.backend-tests.result }}"
+          echo "Frontend: ${{ needs.frontend-tests.result }}"
+
+      - name: Verificar estado
+        if: always()
+        run: |
           FRONTEND_STATUS="${{ needs.frontend-tests.result }}"
-
-          echo "Backend Status: $BACKEND_STATUS"
-          echo "Frontend Status: $FRONTEND_STATUS"
-
           if [ "$FRONTEND_STATUS" = "success" ]; then
-            echo "✅ Tests Frontend pasaron correctamente"
+            echo "✅ Tests Frontend: ÉXITO"
             exit 0
           else
-            echo "⚠️ Tests Frontend fallaron"
+            echo "❌ Tests Frontend: FALLÓ"
             exit 1
           fi
