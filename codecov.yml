@@ -1,0 +1,31 @@
+coverage:
+  precision: 2
+  round: down
+  range: "70...100"
+
+ignore:
+  - "tests"
+  - "node_modules"
+  - "vendor"
+
+flags:
+  backend:
+    paths:
+      - api/
+      - config/
+    carryforward: true
+  frontend:
+    paths:
+      - js/
+    carryforward: true
+
+comment:
+  layout: "reach,diff,flags,files"
+  behavior: default
+  require_changes: no
+  require_base: no
+  require_head: yes
+  branches:
+    - main
+    - refactor/phase1
+    - develop

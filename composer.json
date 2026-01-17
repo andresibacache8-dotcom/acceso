@@ -1,0 +1,28 @@
+{
+  "name": "scad/api-tests",
+  "description": "Sistema de Control de Acceso Digital - Testing Suite",
+  "type": "project",
+  "require": {
+    "php": ">=8.0"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^10.5",
+    "guzzlehttp/guzzle": "^7.5"
+  },
+  "autoload": {
+    "psr-4": {
+      "SCAD\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "SCAD\\Tests\\": "tests/"
+    }
+  },
+  "scripts": {
+    "test": "phpunit",
+    "test:coverage": "phpunit --coverage-html tests/coverage/html",
+    "test:verbose": "phpunit --verbose",
+    "test:watch": "phpunit --watch"
+  }
+}

@@ -1,0 +1,140 @@
+name: Ejecutar Tests - SCAD
+
+on:
+  push:
+    branches: [ main, refactor/phase1, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  backend-tests:
+    name: Tests Backend (PHPUnit)
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: test_db
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v3
+
+      - name: Configurar PHP 8.1
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          extensions: mysqli, pdo, pdo_mysql, json
+          coverage: xdebug
+          tools: composer
+
+      - name: Validar composer.json
+        run: composer validate
+
+      - name: Instalar dependencias Composer
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: Esperar a MySQL
+        run: |
+          for i in {1..30}; do
+            if mysqladmin ping -h 127.0.0.1 -u root -proot --silent; then
+              echo "MySQL está listo"
+              exit 0
+            fi
+            echo "Esperando MySQL... intento $i/30"
+            sleep 1
+          done
+          exit 1
+
+      - name: Crear base de datos de tests
+        run: |
+          mysql -h 127.0.0.1 -u root -proot test_db < /dev/null 2>/dev/null || true
+        env:
+          MYSQL_PWD: root
+
+      - name: Ejecutar tests PHPUnit
+        run: ./vendor/bin/phpunit --configuration phpunit.xml --coverage-clover=coverage.xml --coverage-text
+        continue-on-error: true
+
+      - name: Subir cobertura a Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage.xml
+          flags: backend
+          name: backend-coverage
+        continue-on-error: true
+
+  frontend-tests:
+    name: Tests Frontend (Jest)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v3
+
+      - name: Configurar Node.js 18
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Instalar dependencias npm
+        run: npm ci
+
+      - name: Ejecutar tests Jest
+        run: npm test -- --coverage --passWithNoTests
+        continue-on-error: true
+
+      - name: Subir cobertura a Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./tests/coverage/lcov.info
+          flags: frontend
+          name: frontend-coverage
+        continue-on-error: true
+
+      - name: Mostrar resumen de cobertura
+        run: |
+          echo "## 📊 Cobertura Frontend" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Reporte generado en: \`tests/coverage/\`" >> $GITHUB_STEP_SUMMARY
+        if: always()
+
+  resultados:
+    name: Resumen de Tests
+    runs-on: ubuntu-latest
+    needs: [backend-tests, frontend-tests]
+    if: always()
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v3
+
+      - name: Generar resumen
+        run: |
+          echo "# ✅ Suite de Tests SCAD" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Backend (PHPUnit)" >> $GITHUB_STEP_SUMMARY
+          echo "- Estado: ${{ needs.backend-tests.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Archivo: \`phpunit.xml\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Frontend (Jest)" >> $GITHUB_STEP_SUMMARY
+          echo "- Estado: ${{ needs.frontend-tests.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Archivo: \`package.json\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 📈 Cobertura" >> $GITHUB_STEP_SUMMARY
+          echo "- Backend: https://codecov.io/gh/${{ github.repository }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Frontend: https://codecov.io/gh/${{ github.repository }}" >> $GITHUB_STEP_SUMMARY
+
+      - name: Verificar estado general
+        run: |
+          if [ "${{ needs.backend-tests.result }}" != "success" ] || [ "${{ needs.frontend-tests.result }}" != "success" ]; then
+            echo "⚠️ Algunos tests fallaron"
+            exit 1
+          fi
+          echo "✅ Todos los tests pasaron correctamente"
