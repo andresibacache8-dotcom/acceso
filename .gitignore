@@ -18,7 +18,6 @@ logs/
 
 # Node modules (for testing)
 node_modules/
-package-lock.json
 
 # PHP Composer
 vendor/
