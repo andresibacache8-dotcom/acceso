@@ -1,0 +1,48 @@
+{
+  "name": "scad-frontend",
+  "version": "1.0.0",
+  "description": "Sistema de Control de Acceso Digital - Frontend Testing Suite",
+  "type": "module",
+  "scripts": {
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:watch": "npm test -- --watch",
+    "test:coverage": "npm test -- --coverage",
+    "test:verbose": "npm test -- --verbose",
+    "test:debug": "node --inspect-brk --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "transform": {},
+    "collectCoverageFrom": [
+      "js/utils/**/*.js",
+      "js/api/**/*.js",
+      "js/modules/**/*.js",
+      "!js/**/*.min.js",
+      "!js/lib/**"
+    ],
+    "coverageDirectory": "tests/coverage",
+    "coverageReporters": [
+      "text",
+      "lcov",
+      "html"
+    ],
+    "testMatch": [
+      "**/tests/unit/**/*.test.js",
+      "**/tests/integration/**/*.test.js"
+    ],
+    "setupFilesAfterEnv": [
+      "<rootDir>/tests/setup.js"
+    ],
+    "moduleNameMapper": {
+      "^@/(.*)$": "<rootDir>/js/$1"
+    },
+    "testTimeout": 30000,
+    "verbose": false
+  },
+  "devDependencies": {
+    "@jest/globals": "^29.7.0",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
+    "whatwg-fetch": "^3.6.19"
+  }
+}

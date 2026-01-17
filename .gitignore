@@ -1,0 +1,44 @@
+# Configuration files with sensitive data
+config/config.php
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+logs/
+*.log
+
+# Node modules (for testing)
+node_modules/
+
+# PHP Composer
+vendor/
+composer.lock
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# User uploaded files
+foto-emple/
+uploads/
+
+# Build artifacts
+dist/
+build/
+*.min.js.map
+
+# Test coverage reports
+tests/coverage/
+coverage/
+.nyc_output/
+*.lcov
