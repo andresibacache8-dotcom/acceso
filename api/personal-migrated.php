@@ -15,21 +15,15 @@
 
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/core/ResponseHandler.php';
+require_once __DIR__ . '/core/AuthMiddleware.php';
+require_once __DIR__ . '/core/AuditLogger.php';
+require_once __DIR__ . '/core/SecurityHeaders.php';
 
-// Iniciar sesión
-session_start();
+// Aplicar security headers
+SecurityHeaders::applyApiHeaders();
 
-// Headers CORS y Content-Type
-header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
-
-// Manejar preflight OPTIONS
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
-    exit;
-}
+// Manejar preflight CORS
+SecurityHeaders::handleCors();
 
 // Obtener conexión a base de datos personal
 $databaseConfig = DatabaseConfig::getInstance();
@@ -217,14 +211,27 @@ function handleGet($conn, $connAcceso) {
  */
 function handlePost($conn) {
     try {
+        // Requiere autenticación
+        $user = AuthMiddleware::requireAuth();
+
         $data = json_decode(file_get_contents('php://input'), true);
 
         // Importación masiva
         if (isset($_GET['action']) && $_GET['action'] === 'import') {
+            AuditLogger::log('DATA_MODIFIED', [
+                'action' => 'bulk_import_personal',
+                'count' => count($data['personal'] ?? []),
+                'user_id' => $user['userId'] ?? null
+            ]);
             handleImportMasivo($conn, $data);
         }
         // Crear un único personal
         else {
+            AuditLogger::log('DATA_MODIFIED', [
+                'action' => 'create_personal',
+                'rut' => $data['NrRut'] ?? null,
+                'user_id' => $user['userId'] ?? null
+            ]);
             handleCreatePersonal($conn, $data);
         }
 
@@ -474,12 +481,21 @@ function handleCreatePersonal($conn, $data) {
  */
 function handlePut($conn) {
     try {
+        // Requiere autenticación
+        $user = AuthMiddleware::requireAuth();
+
         $data = json_decode(file_get_contents('php://input'), true);
         $id = intval($data['id'] ?? 0);
 
         if (!$id) {
             ApiResponse::badRequest('ID de personal requerido');
         }
+
+        AuditLogger::log('DATA_MODIFIED', [
+            'action' => 'update_personal',
+            'personal_id' => $id,
+            'user_id' => $user['userId'] ?? null
+        ]);
 
         // Mapeo de datos
         $fields = [
@@ -549,11 +565,20 @@ function handlePut($conn) {
  */
 function handleDelete($conn) {
     try {
+        // Requiere autenticación
+        $user = AuthMiddleware::requireAuth();
+
         $id = isset($_GET['id']) ? intval($_GET['id']) : null;
 
         if (!$id) {
             ApiResponse::badRequest('ID de personal no especificado');
         }
+
+        AuditLogger::log('DATA_DELETED', [
+            'action' => 'delete_personal',
+            'personal_id' => $id,
+            'user_id' => $user['userId'] ?? null
+        ], 'WARNING');
 
         $stmt = $conn->prepare("DELETE FROM personal WHERE id = ?");
         $stmt->bind_param("i", $id);

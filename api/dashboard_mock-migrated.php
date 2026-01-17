@@ -19,6 +19,22 @@
  */
 
 require_once '../api/core/ResponseHandler.php';
+require_once '../api/core/AuthMiddleware.php';
+require_once '../api/core/AuditLogger.php';
+require_once '../api/core/SecurityHeaders.php';
+
+// Aplicar security headers
+SecurityHeaders::applyApiHeaders();
+
+// Manejar preflight CORS
+SecurityHeaders::handleCors();
+
+// Verificar autenticación con JWT
+try {
+    $user = AuthMiddleware::requireAuth();
+} catch (Exception $e) {
+    ApiResponse::unauthorized($e->getMessage());
+}
 
 // ============================================================================
 // VALIDACIÓN DE MÉTODO

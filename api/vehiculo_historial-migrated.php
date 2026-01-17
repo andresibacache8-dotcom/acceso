@@ -22,18 +22,29 @@
 
 require_once '../config/database.php';
 require_once '../api/core/ResponseHandler.php';
+require_once '../api/core/AuthMiddleware.php';
+require_once '../api/core/AuditLogger.php';
+require_once '../api/core/SecurityHeaders.php';
 
 // ============================================================================
 // VALIDACIÓN Y AUTENTICACIÓN
 // ============================================================================
 
+// Aplicar security headers
+SecurityHeaders::applyApiHeaders();
+
+// Manejar preflight CORS
+SecurityHeaders::handleCors();
+
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     ApiResponse::methodNotAllowed();
 }
 
-// Verificar autenticación
-if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
-    ApiResponse::unauthorized('No autorizado');
+// Verificar autenticación con JWT
+try {
+    $user = AuthMiddleware::requireAuth();
+} catch (Exception $e) {
+    ApiResponse::unauthorized($e->getMessage());
 }
 
 $vehiculo_id = $_GET['vehiculo_id'] ?? null;

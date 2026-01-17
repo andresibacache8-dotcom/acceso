@@ -21,14 +21,21 @@
 
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/core/ResponseHandler.php';
+require_once __DIR__ . '/core/AuthMiddleware.php';
+require_once __DIR__ . '/core/AuditLogger.php';
+require_once __DIR__ . '/core/SecurityHeaders.php';
 
-// Headers y autenticación
-header('Content-Type: application/json');
-session_start();
+// Aplicar security headers
+SecurityHeaders::applyApiHeaders();
 
-// Verificar autenticación (todos los métodos)
-if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
-    ApiResponse::unauthorized('No autorizado. Por favor, inicie sesión.');
+// Manejar preflight CORS
+SecurityHeaders::handleCors();
+
+// Verificar autenticación con JWT
+try {
+    AuthMiddleware::requireAuth();
+} catch (Exception $e) {
+    ApiResponse::unauthorized($e->getMessage());
 }
 
 // Obtener conexiones desde DatabaseConfig singleton

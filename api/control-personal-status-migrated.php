@@ -16,15 +16,24 @@
  */
 
 require_once __DIR__ . '/core/ResponseHandler.php';
+require_once __DIR__ . '/core/AuthMiddleware.php';
+require_once __DIR__ . '/core/AuditLogger.php';
+require_once __DIR__ . '/core/SecurityHeaders.php';
 
 // Headers
-header('Content-Type: application/json');
-session_start();
+// Aplicar security headers
+SecurityHeaders::applyApiHeaders();
+
+// Manejar preflight CORS
+SecurityHeaders::handleCors();
 
 // Verificar autenticación
-if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
-    ApiResponse::unauthorized('No autenticado');
-}
+    // Verificar autenticación con JWT
+    try {
+        $user = AuthMiddleware::requireAuth();
+    } catch (Exception $e) {
+        ApiResponse::unauthorized($e->getMessage());
+    }
 
 // Obtener método HTTP
 $method = $_SERVER['REQUEST_METHOD'];

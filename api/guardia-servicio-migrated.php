@@ -20,9 +20,16 @@
 
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/core/ResponseHandler.php';
+require_once __DIR__ . '/core/AuthMiddleware.php';
+require_once __DIR__ . '/core/AuditLogger.php';
+require_once __DIR__ . '/core/SecurityHeaders.php';
 
 // Headers
-header('Content-Type: application/json');
+// Aplicar security headers
+SecurityHeaders::applyApiHeaders();
+
+// Manejar preflight CORS
+SecurityHeaders::handleCors();
 
 // Obtener conexiones desde DatabaseConfig singleton
 $databaseConfig = DatabaseConfig::getInstance();
