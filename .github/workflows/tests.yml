@@ -104,10 +104,56 @@ jobs:
           echo "Reporte generado en: \`tests/coverage/\`" >> $GITHUB_STEP_SUMMARY
         if: always()
 
+  e2e-tests:
+    name: Tests E2E (Cypress)
+    runs-on: ubuntu-latest
+
+    services:
+      php:
+        image: php:8.1-apache
+        options: >-
+          --health-cmd="curl -f http://localhost || exit 1"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v3
+
+      - name: Configurar Node.js 18
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Instalar dependencias npm
+        run: npm ci
+
+      - name: Ejecutar tests Cypress
+        run: npm run e2e
+        continue-on-error: true
+
+      - name: Subir videos de Cypress
+        uses: actions/upload-artifact@v3
+        if: failure()
+        with:
+          name: cypress-videos
+          path: cypress/videos/
+          retention-days: 7
+
+      - name: Subir screenshots de Cypress
+        uses: actions/upload-artifact@v3
+        if: failure()
+        with:
+          name: cypress-screenshots
+          path: cypress/screenshots/
+          retention-days: 7
+
   resultados:
     name: Resumen de Tests
     runs-on: ubuntu-latest
-    needs: [backend-tests, frontend-tests]
+    needs: [backend-tests, frontend-tests, e2e-tests]
     if: always()
 
     steps:
@@ -118,17 +164,28 @@ jobs:
         if: always()
         run: |
           echo "✅ Suite de Tests SCAD"
-          echo "Backend: ${{ needs.backend-tests.result }}"
-          echo "Frontend: ${{ needs.frontend-tests.result }}"
+          echo "Backend (PHPUnit): ${{ needs.backend-tests.result }}"
+          echo "Frontend (Jest): ${{ needs.frontend-tests.result }}"
+          echo "E2E (Cypress): ${{ needs.e2e-tests.result }}"
 
       - name: Verificar estado
         if: always()
         run: |
           FRONTEND_STATUS="${{ needs.frontend-tests.result }}"
-          if [ "$FRONTEND_STATUS" = "success" ]; then
-            echo "✅ Tests Frontend: ÉXITO"
+          E2E_STATUS="${{ needs.e2e-tests.result }}"
+
+          echo "## 📊 Resumen de Tests" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Suite | Estado |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Backend (PHPUnit) | ${{ needs.backend-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend (Jest) | ${{ needs.frontend-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| E2E (Cypress) | ${{ needs.e2e-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+
+          if [ "$FRONTEND_STATUS" = "success" ] && [ "$E2E_STATUS" = "success" ]; then
+            echo "✅ Tests Frontend y E2E: ÉXITO"
             exit 0
           else
-            echo "❌ Tests Frontend: FALLÓ"
+            echo "❌ Tests Frontend o E2E: FALLÓ"
             exit 1
           fi
