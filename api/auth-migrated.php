@@ -48,6 +48,9 @@ switch ($method) {
     case 'POST':
         handlePost($conn_acceso);
         break;
+    case 'DELETE':
+        handleDelete();
+        break;
     default:
         ApiResponse::error('Método no permitido', 405);
 }
@@ -196,6 +199,36 @@ function handlePost($conn_acceso)
 
     } catch (Exception $e) {
         ApiResponse::serverError('Error al autenticar: ' . $e->getMessage());
+    }
+}
+
+/**
+ * DELETE /api/auth.php
+ * Cerrar sesión del usuario (logout)
+ *
+ * Requiere:
+ * - Header: Authorization: Bearer <token>
+ *
+ * Retorna:
+ * - success: true (204 No Content)
+ */
+function handleDelete()
+{
+    try {
+        // Verificar autenticación
+        $user = AuthMiddleware::requireAuth();
+
+        // Log logout
+        AuditLogger::log('LOGOUT', [
+            'user_id' => $user['userId'] ?? null,
+            'username' => $user['username'] ?? null
+        ]);
+
+        // Retornar 204 No Content
+        ApiResponse::noContent();
+
+    } catch (Exception $e) {
+        ApiResponse::unauthorized($e->getMessage());
     }
 }
 

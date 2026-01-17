@@ -12,14 +12,14 @@ const api = {
         api._hideLoading = hideFn;
     },
 
-    _callApi: async (url, options = {}) => {
+    _callApi: async (url, options = {}, retryCount = 0) => {
         if (api._showLoading) api._showLoading();
         try {
             // Asegurarnos de que el método está explícito para GET
             if (!options.method) {
                 options.method = 'GET';
             }
-            
+
             // Agregar encabezados para evitar caché
             if (!options.headers) {
                 options.headers = {};
@@ -27,10 +27,16 @@ const api = {
             options.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
             options.headers['Pragma'] = 'no-cache';
             options.headers['Expires'] = '0';
-            
+
+            // Agregar JWT token en Authorization header si está disponible
+            if (typeof authService !== 'undefined' && authService.isAuthenticated()) {
+                const token = authService.getAccessToken();
+                options.headers['Authorization'] = `Bearer ${token}`;
+            }
+
             // Incluir cookies de sesión en todas las solicitudes
             options.credentials = 'include';
-            
+
             const response = await fetch(url, options);
 
             // Handle 204 No Content response separately
@@ -38,11 +44,28 @@ const api = {
                 return null;
             }
 
+            // Manejar token expirado (401)
+            if (response.status === 401 && retryCount === 0 && typeof authService !== 'undefined' && authService.isAuthenticated()) {
+                console.log('Token expirado, intentando refrescar...');
+                const refreshResult = await authService.refreshAccessToken();
+
+                if (refreshResult.success) {
+                    // Reintentar la solicitud con el nuevo token
+                    return api._callApi(url, options, 1);
+                } else {
+                    // Refresh falló, redirigir a login
+                    window.location.href = 'login.html';
+                    throw new Error('Sesión expirada. Por favor, inicie sesión de nuevo.');
+                }
+            }
+
             if (!response.ok) {
                 let errorMessage = `Error HTTP: ${response.status}`;
                 try {
                     const errorJson = await response.json();
-                    if (errorJson.message) {
+                    if (errorJson.error?.message) {
+                        errorMessage = errorJson.error.message;
+                    } else if (errorJson.message) {
                         errorMessage = errorJson.message;
                     } else {
                         errorMessage = await response.text();
