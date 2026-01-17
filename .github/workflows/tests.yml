@@ -59,7 +59,6 @@ jobs:
 
       - name: Ejecutar tests PHPUnit
         run: ./vendor/bin/phpunit --configuration phpunit.xml --coverage-clover=coverage.xml --coverage-text
-        continue-on-error: true
 
       - name: Subir cobertura a Codecov
         uses: codecov/codecov-action@v3
@@ -87,8 +86,7 @@ jobs:
         run: npm ci
 
       - name: Ejecutar tests Jest
-        run: npm test -- --coverage --passWithNoTests
-        continue-on-error: true
+        run: npm test -- --coverage
 
       - name: Subir cobertura a Codecov
         uses: codecov/codecov-action@v3
@@ -132,9 +130,18 @@ jobs:
           echo "- Frontend: https://codecov.io/gh/${{ github.repository }}" >> $GITHUB_STEP_SUMMARY
 
       - name: Verificar estado general
+        if: always()
         run: |
-          if [ "${{ needs.backend-tests.result }}" != "success" ] || [ "${{ needs.frontend-tests.result }}" != "success" ]; then
+          BACKEND_STATUS="${{ needs.backend-tests.result }}"
+          FRONTEND_STATUS="${{ needs.frontend-tests.result }}"
+
+          echo "Backend Status: $BACKEND_STATUS"
+          echo "Frontend Status: $FRONTEND_STATUS"
+
+          if [ "$BACKEND_STATUS" = "success" ] && [ "$FRONTEND_STATUS" = "success" ]; then
+            echo "✅ Todos los tests pasaron correctamente"
+            exit 0
+          else
             echo "⚠️ Algunos tests fallaron"
             exit 1
           fi
-          echo "✅ Todos los tests pasaron correctamente"

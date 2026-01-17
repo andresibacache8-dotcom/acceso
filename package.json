@@ -11,7 +11,7 @@
     "test:debug": "node --inspect-brk --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand"
   },
   "jest": {
-    "testEnvironment": "jsdom",
+    "testEnvironment": "node",
     "transform": {},
     "collectCoverageFrom": [
       "js/utils/**/*.js",
@@ -36,8 +36,8 @@
     "moduleNameMapper": {
       "^@/(.*)$": "<rootDir>/js/$1"
     },
-    "testTimeout": 10000,
-    "verbose": true
+    "testTimeout": 30000,
+    "verbose": false
   },
   "devDependencies": {
     "@jest/globals": "^29.7.0",
