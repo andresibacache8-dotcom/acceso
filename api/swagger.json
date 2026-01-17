@@ -1,0 +1,729 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Sistema de Control de Acceso Digital (SCAD) API",
+    "version": "2.0.0",
+    "description": "API RESTful de gestión de acceso, personal, vehículos, visitas y reportes",
+    "contact": {
+      "name": "SCAD Team",
+      "url": "https://github.com/andresibacache8-dotcom/acceso"
+    },
+    "license": {
+      "name": "MIT"
+    }
+  },
+  "servers": [
+    {
+      "url": "/acceso/api",
+      "description": "Servidor de desarrollo/producción"
+    }
+  ],
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "JWT Bearer token obtenido en login. Usar en Authorization header: Bearer <token>"
+      }
+    },
+    "schemas": {
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 1
+          },
+          "username": {
+            "type": "string",
+            "example": "admin"
+          },
+          "role": {
+            "type": "string",
+            "enum": ["admin", "user", "supervisor"],
+            "example": "admin"
+          }
+        },
+        "required": ["id", "username", "role"]
+      },
+      "LoginRequest": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "example": "admin"
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "example": "password123"
+          }
+        },
+        "required": ["username", "password"]
+      },
+      "TokenResponse": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "JWT Access Token (válido 1 hora)"
+          },
+          "refreshToken": {
+            "type": "string",
+            "description": "JWT Refresh Token (válido 7 días)"
+          },
+          "user": {
+            "$ref": "#/components/schemas/User"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": false
+          },
+          "error": {
+            "type": "object",
+            "properties": {
+              "message": {
+                "type": "string"
+              },
+              "code": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      },
+      "Personal": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "Grado": {
+            "type": "string"
+          },
+          "Nombres": {
+            "type": "string"
+          },
+          "Paterno": {
+            "type": "string"
+          },
+          "Materno": {
+            "type": "string"
+          },
+          "NrRut": {
+            "type": "string",
+            "format": "email",
+            "example": "12345678-9"
+          },
+          "Unidad": {
+            "type": "string"
+          },
+          "Estado": {
+            "type": "integer",
+            "enum": [0, 1]
+          },
+          "es_residente": {
+            "type": "integer",
+            "enum": [0, 1]
+          }
+        }
+      },
+      "Vehiculo": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "patente": {
+            "type": "string",
+            "example": "AA1234"
+          },
+          "marca": {
+            "type": "string"
+          },
+          "modelo": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string"
+          },
+          "propietario_id": {
+            "type": "integer"
+          },
+          "propietario_tipo": {
+            "type": "string",
+            "enum": ["personal", "empresa", "visita"]
+          }
+        }
+      },
+      "Visita": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "apellido": {
+            "type": "string"
+          },
+          "rut": {
+            "type": "string"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": ["Visita", "Familiar"]
+          },
+          "motivo_visita": {
+            "type": "string"
+          },
+          "en_lista_negra": {
+            "type": "integer",
+            "enum": [0, 1]
+          }
+        }
+      },
+      "Empresa": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "rut": {
+            "type": "string"
+          },
+          "giro": {
+            "type": "string"
+          },
+          "telefono": {
+            "type": "string"
+          },
+          "direccion": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/auth-migrated.php": {
+      "post": {
+        "tags": ["Autenticación"],
+        "summary": "Login - Obtener JWT Token",
+        "description": "Autenticar usuario y recibir access token + refresh token",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login exitoso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/TokenResponse"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Credenciales inválidas o demasiados intentos"
+          },
+          "429": {
+            "description": "Rate limited - Demasiados intentos de login (máx 5 en 5 minutos)"
+          }
+        }
+      },
+      "get": {
+        "tags": ["Autenticación"],
+        "summary": "Verificar Autenticación",
+        "description": "Verificar si el JWT token actual es válido",
+        "responses": {
+          "200": {
+            "description": "Usuario autenticado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/User"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token inválido o expirado"
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Autenticación"],
+        "summary": "Logout - Cerrar Sesión",
+        "description": "Cerrar sesión e invalidar token actual",
+        "responses": {
+          "204": {
+            "description": "Logout exitoso"
+          },
+          "401": {
+            "description": "Token inválido"
+          }
+        }
+      }
+    },
+    "/auth-refresh.php": {
+      "post": {
+        "tags": ["Autenticación"],
+        "summary": "Refrescar Access Token",
+        "description": "Generar nuevo access token usando refresh token",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Token refrescado exitosamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "token": {
+                          "type": "string",
+                          "description": "Nuevo access token"
+                        },
+                        "expires_in": {
+                          "type": "integer",
+                          "example": 3600
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Refresh token inválido o expirado"
+          }
+        }
+      }
+    },
+    "/personal-migrated.php": {
+      "get": {
+        "tags": ["Personal"],
+        "summary": "Listar Personal",
+        "description": "Obtener lista paginada de personal",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "perPage",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "maximum": 500
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Buscar por nombre o RUT"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["inside"]
+            },
+            "description": "Filtrar personal dentro del recinto"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de personal obtenida"
+          },
+          "401": {
+            "description": "No autenticado"
+          }
+        }
+      },
+      "post": {
+        "tags": ["Personal"],
+        "summary": "Crear Personal",
+        "description": "Crear nuevo registro de personal",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Personal"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Personal creado exitosamente"
+          },
+          "400": {
+            "description": "Datos inválidos"
+          },
+          "401": {
+            "description": "No autenticado"
+          }
+        }
+      },
+      "put": {
+        "tags": ["Personal"],
+        "summary": "Actualizar Personal",
+        "description": "Actualizar datos de personal existente",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Personal"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Personal actualizado"
+          },
+          "401": {
+            "description": "No autenticado"
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Personal"],
+        "summary": "Eliminar Personal",
+        "description": "Eliminar registro de personal",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Personal eliminado"
+          },
+          "401": {
+            "description": "No autenticado"
+          }
+        }
+      }
+    },
+    "/vehiculos-migrated.php": {
+      "get": {
+        "tags": ["Vehículos"],
+        "summary": "Listar Vehículos",
+        "responses": {
+          "200": {
+            "description": "Lista de vehículos"
+          }
+        }
+      },
+      "post": {
+        "tags": ["Vehículos"],
+        "summary": "Crear Vehículo",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Vehiculo"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Vehículo creado"
+          }
+        }
+      }
+    },
+    "/visitas-migrated.php": {
+      "get": {
+        "tags": ["Visitas"],
+        "summary": "Listar Visitas",
+        "responses": {
+          "200": {
+            "description": "Lista de visitas"
+          }
+        }
+      },
+      "post": {
+        "tags": ["Visitas"],
+        "summary": "Crear Visita",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Visita"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Visita creada"
+          }
+        }
+      }
+    },
+    "/empresas-migrated.php": {
+      "get": {
+        "tags": ["Empresas"],
+        "summary": "Listar Empresas",
+        "responses": {
+          "200": {
+            "description": "Lista de empresas"
+          }
+        }
+      },
+      "post": {
+        "tags": ["Empresas"],
+        "summary": "Crear Empresa",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Empresa"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Empresa creada"
+          }
+        }
+      }
+    },
+    "/dashboard-migrated.php": {
+      "get": {
+        "tags": ["Dashboard"],
+        "summary": "Obtener Datos Dashboard",
+        "description": "Obtener contadores y estadísticas del dashboard",
+        "parameters": [
+          {
+            "name": "details",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["personal", "vehiculos", "visitas", "empresas"]
+            },
+            "description": "Categoría para obtener detalles"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Datos del dashboard"
+          }
+        }
+      }
+    },
+    "/reportes-migrated.php": {
+      "get": {
+        "tags": ["Reportes"],
+        "summary": "Generar Reporte",
+        "description": "Generar reportes de acceso, vehículos, visitas, etc.",
+        "parameters": [
+          {
+            "name": "report_type",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "acceso_personal",
+                "horas_extra",
+                "acceso_general",
+                "acceso_vehiculos",
+                "acceso_visitas",
+                "personal_comision",
+                "salida_no_autorizada"
+              ]
+            }
+          },
+          {
+            "name": "fecha_inicio",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "fecha_fin",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "export",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["json", "pdf"]
+            },
+            "default": "json"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reporte generado"
+          }
+        }
+      }
+    },
+    "/log_access-migrated.php": {
+      "get": {
+        "tags": ["Logs"],
+        "summary": "Obtener Logs de Acceso",
+        "parameters": [
+          {
+            "name": "target_type",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["personal", "vehiculo", "visita"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Logs de acceso"
+          }
+        }
+      },
+      "post": {
+        "tags": ["Logs"],
+        "summary": "Registrar Acceso",
+        "description": "Registrar nuevo evento de acceso",
+        "responses": {
+          "201": {
+            "description": "Acceso registrado"
+          }
+        }
+      }
+    },
+    "/portico-migrated.php": {
+      "post": {
+        "tags": ["Pórtico"],
+        "summary": "Registrar Acceso Pórtico",
+        "description": "Registrar acceso por punto pórtico",
+        "responses": {
+          "200": {
+            "description": "Acceso registrado"
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Autenticación",
+      "description": "Endpoints de login, logout y token management"
+    },
+    {
+      "name": "Personal",
+      "description": "Gestión de personal y empleados"
+    },
+    {
+      "name": "Vehículos",
+      "description": "Gestión de vehículos y patentes"
+    },
+    {
+      "name": "Visitas",
+      "description": "Gestión de visitantes"
+    },
+    {
+      "name": "Empresas",
+      "description": "Gestión de empresas y contratistas"
+    },
+    {
+      "name": "Dashboard",
+      "description": "Datos estadísticos y contadores"
+    },
+    {
+      "name": "Reportes",
+      "description": "Generación de reportes en JSON o PDF"
+    },
+    {
+      "name": "Logs",
+      "description": "Registro y consulta de logs de acceso"
+    },
+    {
+      "name": "Pórtico",
+      "description": "Control de acceso por pórtico"
+    }
+  ]
+}

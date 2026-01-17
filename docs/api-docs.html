@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SCAD API Documentation - Swagger UI</title>
+    <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.15.5/swagger-ui.min.css">
+    <link rel="icon" type="image/png" href="https://fastapi.tiangolo.com/img/favicon.png" sizes="32x32" />
+    <style>
+        html {
+            box-sizing: border-box;
+            overflow: -moz-scrollbars-vertical;
+            overflow-y: scroll;
+        }
+        *, *:before, *:after {
+            box-sizing: inherit;
+        }
+        body {
+            margin: 0;
+            background: #fafafa;
+        }
+        .topbar {
+            background-color: #1c1c1c;
+            padding: 10px 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-left: 20px;
+            padding-right: 20px;
+        }
+        .topbar-title {
+            color: #fff;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .topbar-version {
+            color: #9ca3af;
+            font-size: 14px;
+        }
+        .info-section {
+            background-color: #ffffff;
+            border-bottom: 1px solid #e5e7eb;
+            padding: 20px 40px;
+            margin-bottom: 20px;
+        }
+        .info-section h1 {
+            margin: 0 0 10px 0;
+            font-size: 28px;
+            color: #1c1c1c;
+        }
+        .info-section p {
+            margin: 5px 0;
+            color: #6b7280;
+        }
+        .info-section a {
+            color: #3b82f6;
+            text-decoration: none;
+        }
+        .info-section a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <div class="topbar-title">📚 SCAD API Documentation</div>
+        <div class="topbar-version">v2.0.0</div>
+    </div>
+
+    <div class="info-section">
+        <h1>Sistema de Control de Acceso Digital (SCAD)</h1>
+        <p><strong>API RESTful</strong> para gestión de acceso, personal, vehículos, visitas y reportes</p>
+        <p>
+            <strong>Base URL:</strong> <code>/acceso/api</code> |
+            <strong>Auth:</strong> JWT Bearer Token |
+            <strong>Status:</strong> ✅ Production Ready
+        </p>
+        <p>
+            <strong>Repositorio:</strong>
+            <a href="https://github.com/andresibacache8-dotcom/acceso" target="_blank">GitHub - SCAD</a>
+        </p>
+    </div>
+
+    <div id="swagger-ui"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.15.5/swagger-ui.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.15.5/swagger-ui-bundle.min.js"></script>
+    <script>
+        const ui = SwaggerUIBundle({
+            url: '../api/swagger.json',
+            dom_id: '#swagger-ui',
+            presets: [
+                SwaggerUIBundle.presets.apis,
+                SwaggerUIBundle.SwaggerUIStandalonePreset
+            ],
+            layout: "BaseLayout",
+            deepLinking: true,
+            requestInterceptor: (request) => {
+                // Agregar timestamp para evitar caché
+                if (request.method === 'GET') {
+                    request.url += (request.url.includes('?') ? '&' : '?') + 'nocache=' + Date.now();
+                }
+                return request;
+            },
+            onComplete: function() {
+                console.log("Swagger UI loaded successfully");
+            }
+        });
+
+        window.onload = function() {
+            // Highlight Autenticación como default
+            setTimeout(() => {
+                const authTag = document.querySelector('[data-tag="Autenticación"]');
+                if (authTag) {
+                    authTag.click();
+                }
+            }, 500);
+        }
+    </script>
+
+    <!-- Guía de uso -->
+    <style>
+        .guide-section {
+            background: white;
+            margin: 20px 40px;
+            padding: 20px;
+            border-radius: 4px;
+            border-left: 4px solid #3b82f6;
+        }
+        .guide-section h3 {
+            margin-top: 0;
+            color: #1c1c1c;
+        }
+        .guide-section code {
+            background: #f3f4f6;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+        .guide-section pre {
+            background: #1f2937;
+            color: #e5e7eb;
+            padding: 12px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+
+    <!-- Footer con guía rápida -->
+    <div style="margin-top: 40px;">
+        <div class="guide-section">
+            <h3>🔐 Guía de Autenticación</h3>
+            <p>Todos los endpoints requieren JWT Bearer Token excepto <code>POST /auth-migrated.php</code></p>
+            <ol>
+                <li><strong>Login:</strong> POST <code>/auth-migrated.php</code> con username/password</li>
+                <li><strong>Recibir:</strong> <code>token</code> y <code>refreshToken</code></li>
+                <li><strong>Usar:</strong> Header <code>Authorization: Bearer {token}</code></li>
+                <li><strong>Refrescar:</strong> POST <code>/auth-refresh.php</code> con refresh token</li>
+                <li><strong>Logout:</strong> DELETE <code>/auth-migrated.php</code></li>
+            </ol>
+        </div>
+
+        <div class="guide-section">
+            <h3>💡 Ejemplos de Uso</h3>
+            <p><strong>Login:</strong></p>
+            <pre>curl -X POST /acceso/api/auth-migrated.php \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "admin",
+    "password": "password"
+  }'</pre>
+
+            <p><strong>Usar Token en Solicitudes:</strong></p>
+            <pre>curl -X GET /acceso/api/personal-migrated.php \
+  -H "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGc..."</pre>
+
+            <p><strong>Refrescar Token:</strong></p>
+            <pre>curl -X POST /acceso/api/auth-refresh.php \
+  -H "Authorization: Bearer {refreshToken}"</pre>
+        </div>
+
+        <div class="guide-section">
+            <h3>⚡ Rate Limiting</h3>
+            <p><strong>Login:</strong> Máximo 5 intentos por IP en 5 minutos</p>
+            <p><strong>General:</strong> Sin límite (configurable en .env)</p>
+            <p><strong>Respuesta 429:</strong> Demasiadas solicitudes - esperar 15 minutos</p>
+        </div>
+
+        <div class="guide-section">
+            <h3>📊 Características</h3>
+            <ul>
+                <li>✅ JWT Authentication (access + refresh tokens)</li>
+                <li>✅ Rate Limiting en endpoints críticos</li>
+                <li>✅ Audit Logging de todas las operaciones</li>
+                <li>✅ CORS Headers (configurable en .env)</li>
+                <li>✅ Security Headers (CSP, HSTS, X-Frame-Options)</li>
+                <li>✅ Error Handling estandarizado</li>
+                <li>✅ Paginación en listados</li>
+                <li>✅ Búsqueda y filtrado</li>
+            </ul>
+        </div>
+
+        <div class="guide-section">
+            <h3>🛠️ Variables de Entorno (.env)</h3>
+            <p>Ver archivo <strong>.env.example</strong> para configuración completa:</p>
+            <ul>
+                <li><code>JWT_SECRET</code> - Clave secreta (⚠️ CAMBIAR EN PRODUCCIÓN)</li>
+                <li><code>JWT_ACCESS_EXPIRATION</code> - Duración access token (3600 = 1 hora)</li>
+                <li><code>JWT_REFRESH_EXPIRATION</code> - Duración refresh token (604800 = 7 días)</li>
+                <li><code>RATE_LIMIT_LOGIN_ATTEMPTS</code> - Intentos de login permitidos</li>
+                <li><code>CORS_ALLOWED_ORIGINS</code> - Orígenes CORS permitidos</li>
+                <li><code>LOG_LEVEL</code> - Nivel de logging (DEBUG, INFO, WARNING, ERROR)</li>
+            </ul>
+        </div>
+
+        <div class="guide-section">
+            <h3>📚 Recursos Adicionales</h3>
+            <ul>
+                <li>📖 <a href="https://swagger.io/specification/" target="_blank">OpenAPI 3.0 Specification</a></li>
+                <li>🔒 <a href="https://tools.ietf.org/html/rfc7519" target="_blank">JWT (RFC 7519)</a></li>
+                <li>📝 <strong>README.md</strong> - Guía general del proyecto</li>
+                <li>🧪 <strong>TESTING.md</strong> - Guía de testing (PHPUnit + Jest)</li>
+                <li>⚙️ <strong>.env.example</strong> - Configuración y variables de entorno</li>
+            </ul>
+        </div>
+    </div>
+
+    <div style="text-align: center; padding: 40px; color: #9ca3af; font-size: 12px;">
+        <p>SCAD API v2.0.0 | © 2025 | <a href="https://github.com/andresibacache8-dotcom/acceso" target="_blank" style="color: #3b82f6;">GitHub Repository</a></p>
+    </div>
+</body>
+</html>
